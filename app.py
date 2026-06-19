@@ -14,7 +14,7 @@ if sys.version_info >= (3, 14):
     except:
         pass
 
-# আপনার বট ফাইল থেকে import
+# আপনার বট ফাইল থেকে import (bot.py)
 from bot import main as run_bot
 
 app = Flask(__name__)
