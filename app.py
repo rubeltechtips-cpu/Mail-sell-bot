@@ -7,14 +7,14 @@ warnings.filterwarnings("ignore")
 
 from flask import Flask, jsonify
 
-# Python 3.14 Event Loop Fix
+# Python 3.14 এর জন্য Event Loop Fix
 if sys.version_info >= (3, 14):
     try:
         asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
     except:
         pass
 
-# আপনার বট ফাইল থেকে import (bot.py)
+# আপনার বট ফাইল থেকে import
 from bot import main as run_bot
 
 app = Flask(__name__)
@@ -34,7 +34,6 @@ def ping():
 def run_bot_thread():
     """বটকে আলাদা থ্রেডে চালান"""
     try:
-        # নতুন event loop তৈরি করুন
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         run_bot()
