@@ -41,7 +41,7 @@ logger = logging.getLogger(__name__)
 
 # ================ CHANNEL CHECK (TEMPORARILY DISABLED) ================
 async def check_subscription(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    return True  # ← টেস্টের জন্য বাইপাস
+    return True  # ← টেস্টের জন্য সবসময় True দিন  # ← টেস্টের জন্য বাইপাস
 
 # ================ STATES ================
 (
