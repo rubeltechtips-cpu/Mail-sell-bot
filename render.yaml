@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: mail-sell-bot
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python app.py
+    envVars:
+      - key: BOT_TOKEN
+        value: 8196949746:AAHPGwCkmoA-tYPe-vXwXro-ERp6a3a4s68
+      - key: PYTHON_VERSION
+        value: 3.11.0
+    autoDeploy: true
+  
+  - type: worker
+    name: mail-sell-bot-worker
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python worker.py
+    envVars:
+      - key: BOT_TOKEN
+        value: 8196949746:AAHPGwCkmoA-tYPe-vXwXro-ERp6a3a4s68
+      - key: PYTHON_VERSION
+        value: 3.11.0
+    autoDeploy: true
