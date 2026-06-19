@@ -1,21 +1,20 @@
 import os
 import threading
 import sys
+import asyncio
 import warnings
 warnings.filterwarnings("ignore")
 
 from flask import Flask, jsonify
 
-# Python 3.14 এর জন্য patch
+# Python 3.14 Event Loop Fix
 if sys.version_info >= (3, 14):
     try:
-        import telegram.ext._updater
-        if not hasattr(telegram.ext._updater.Updater, '_Updater__polling_cleanup_cb'):
-            telegram.ext._updater.Updater._Updater__polling_cleanup_cb = None
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
     except:
         pass
 
-# আপনার বট ফাইল থেকে import করুন (যেহেতু আপনি bot.py নাম দিয়েছেন)
+# আপনার বট ফাইল থেকে import
 from bot import main as run_bot
 
 app = Flask(__name__)
@@ -35,6 +34,9 @@ def ping():
 def run_bot_thread():
     """বটকে আলাদা থ্রেডে চালান"""
     try:
+        # নতুন event loop তৈরি করুন
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
         run_bot()
     except Exception as e:
         print(f"Bot error: {e}")
