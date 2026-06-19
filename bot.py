@@ -1,23 +1,39 @@
+import logging
 import os
+import io
+import time
 import sys
 import asyncio
+import json
 import warnings
 warnings.filterwarnings("ignore")
 
 # Python 3.14 এর জন্য Event Loop Fix
 if sys.version_info >= (3, 14):
     try:
-        import asyncio
         asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
     except:
         pass
 
-# আপনার BOT_TOKEN চেক করুন (Environment Variable থেকে)
-BOT_TOKEN = os.environ.get('BOT_TOKEN', '8196949746:AAHPGwCkmoA-tYPe-vXwXro-ERp6a3a4s68')
+from telegram import (
+    Update, ReplyKeyboardMarkup, KeyboardButton, InputFile,
+    ReplyKeyboardRemove, InlineKeyboardMarkup, InlineKeyboardButton
+)
+from telegram.ext import (
+    ApplicationBuilder, CommandHandler, MessageHandler,
+    filters, ContextTypes, ConversationHandler, CallbackQueryHandler
+)
+from telegram.constants import ChatMemberStatus
+from openpyxl import Workbook, load_workbook
 
-# Channel Check বাইপাস করুন (টেস্টের জন্য)
-async def check_subscription(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    return True  # ← টেস্টের জন্য সবসময় True
+# ================ CONFIG ================
+BOT_TOKEN = os.environ.get('BOT_TOKEN', '8196949746:AAHPGwCkmoA-tYPe-vXwXro-ERp6a3a4s68')
+ADMIN_ID = 8061006207
+ADMIN_USERNAME = "Rubel_QSB"
+CHANNEL_USERNAME = "quick_sell_bd"
+DATA_DIR = "categories"
+
+os.makedirs(DATA_DIR, exist_ok=True)
 
 # ================ STATES ================
 (
