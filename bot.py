@@ -8,7 +8,7 @@ import json
 import warnings
 warnings.filterwarnings("ignore")
 
-# Python 3.14 এর জন্য Event Loop Fix
+# ================ EVENT LOOP FIX FOR PYTHON 3.14 ================
 if sys.version_info >= (3, 14):
     try:
         asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
@@ -34,6 +34,14 @@ CHANNEL_USERNAME = "quick_sell_bd"
 DATA_DIR = "categories"
 
 os.makedirs(DATA_DIR, exist_ok=True)
+
+# ================ LOGGER ================
+logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# ================ CHANNEL CHECK (TEMPORARILY DISABLED) ================
+async def check_subscription(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    return True  # ← টেস্টের জন্য বাইপাস
 
 # ================ STATES ================
 (
