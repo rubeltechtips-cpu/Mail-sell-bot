@@ -8,19 +8,12 @@ import json
 import warnings
 warnings.filterwarnings("ignore")
 
-# ================ EVENT LOOP FIX FOR PYTHON 3.14 ================
-if sys.version_info >= (3, 14):
-    try:
-        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
-    except:
-        pass
-
 from telegram import (
     Update, ReplyKeyboardMarkup, KeyboardButton, InputFile,
     ReplyKeyboardRemove, InlineKeyboardMarkup, InlineKeyboardButton
 )
 from telegram.ext import (
-    ApplicationBuilder, CommandHandler, MessageHandler,
+    Application, CommandHandler, MessageHandler,
     filters, ContextTypes, ConversationHandler, CallbackQueryHandler
 )
 from telegram.constants import ChatMemberStatus
@@ -38,10 +31,6 @@ os.makedirs(DATA_DIR, exist_ok=True)
 # ================ LOGGER ================
 logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-# ================ CHANNEL CHECK (TEMPORARILY DISABLED) ================
-async def check_subscription(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    return True  # ← টেস্টের জন্য সবসময় True দিন  # ← টেস্টের জন্য বাইপাস
 
 # ================ STATES ================
 (
@@ -76,10 +65,6 @@ async def check_subscription(update: Update, context: ContextTypes.DEFAULT_TYPE)
     EDIT_USER_FIELD,
     RECEIVE_USER_EDIT_VALUE
 ) = range(30)
-
-# ================ LOGGER ================
-logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 # ================ DATA ================
 categories = {}
@@ -228,28 +213,11 @@ BACK_TO_SUB_CATEGORIES = KeyboardButton("🔙 Back to Sub-Categories")
 BACK_TO_ADMIN = KeyboardButton("🔙 Back to Admin Panel")
 BACK_TO_MANAGE_MAIN = KeyboardButton("🔙 Back to Manage Main Categories")
 
-# ================ HANDLERS ================
+# ================ CHANNEL CHECK (DISABLED FOR TESTING) ================
 async def check_subscription(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    try:
-        chat_member = await context.bot.get_chat_member(chat_id=f"@{CHANNEL_USERNAME}", user_id=user_id)
-        if chat_member.status in [ChatMemberStatus.MEMBER, ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.OWNER]:
-            return True
-        else:
-            keyboard = InlineKeyboardMarkup([
-                [InlineKeyboardButton("Join Channel", url=f"https://t.me/{CHANNEL_USERNAME}")]
-            ])
-            await update.message.reply_text(
-                "❌ You haven't joined our channel yet.\n"
-                "Please click the button below to join the channel.",
-                reply_markup=keyboard
-            )
-            return False
-    except Exception as e:
-        logger.error(f"Error checking subscription: {e}")
-        await update.message.reply_text("There was an error checking channel membership. Please try again later.")
-        return False
+    return True  # টেস্টের জন্য বাইপাস
 
+# ================ HANDLERS ================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await check_subscription(update, context):
         return ConversationHandler.END
@@ -426,6 +394,410 @@ async def show_dashboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True),
         parse_mode='HTML'
     )
+    return ADMIN_PANEL
+
+# ================ BUY HANDLERS ================
+async def user_choose_category(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await check_subscription(update, context):
+        return ConversationHandler.END
+        
+    text = update.message.text.strip()
+    original_cat = text.split(" (")[0]
+    
+    if original_cat == "🔙 Back to Main Menu":
+        return await back_to_main(update, context)
+
+    context.user_data.clear()
+
+    if original_cat in categories.keys():
+        context.user_data["temp_main_cat_for_buy"] = original_cat
+        
+        keyboard = []
+        for sub_cat in categories[original_cat]:
+            stock_count = count_items(original_cat, sub_cat)
+            keyboard.append([KeyboardButton(f"{sub_cat} ({stock_count})")])
+        
+        keyboard.append([BACK_TO_CATEGORIES])
+        keyboard.append([BACK_TO_MAIN])
+        
+        await update.message.reply_text(
+            f"🛒 Choose sub-category for **{original_cat}**:",
+            reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+        )
+        return BUY_SUB_MENU
+
+    await update.message.reply_text("❌ Category not found.")
+    return BUY_MENU
+
+async def user_choose_subcategory(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await check_subscription(update, context):
+        return ConversationHandler.END
+        
+    text = update.message.text.strip()
+    original_sub_cat = text.split(" (")[0]
+    main_cat = context.user_data.get('temp_main_cat_for_buy')
+    
+    if text == "🔙 Back to Categories":
+        return await back_to_categories(update, context)
+    if text == "🔙 Back to Main Menu":
+        return await back_to_main(update, context)
+        
+    if main_cat and original_sub_cat in categories.get(main_cat, []):
+        context.user_data["order"] = {"main_cat": main_cat, "sub_cat": original_sub_cat}
+        
+        price = prices.get(main_cat, {}).get(original_sub_cat, "Price not set yet.")
+        
+        keyboard = [
+            [BACK_TO_SUB_CATEGORIES],
+            [BACK_TO_MAIN]
+        ]
+        
+        await update.message.reply_text(
+            f"✅ You selected **{original_sub_cat}**.\n💰 **Price per item:** {price} Taka\n\n"
+            f"✍️ Enter quantity:",
+            reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+        )
+        return GET_QUANTITY
+
+    await update.message.reply_text("❌ Sub-category not found.")
+    return BUY_SUB_MENU
+
+async def back_to_categories(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await check_subscription(update, context):
+        return ConversationHandler.END
+
+    keyboard = []
+    for cat in categories.keys():
+        keyboard.append([KeyboardButton(cat)])
+    keyboard.append([BACK_TO_MAIN])
+    await update.message.reply_text(
+        "🛒 Choose a category:",
+        reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+    )
+    return BUY_MENU
+
+async def back_to_subcategories(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await check_subscription(update, context):
+        return ConversationHandler.END
+    
+    main_cat = context.user_data.get('temp_main_cat_for_buy')
+    if not main_cat:
+        return await back_to_categories(update, context)
+        
+    keyboard = []
+    for sub_cat in categories[main_cat]:
+        stock_count = count_items(main_cat, sub_cat)
+        keyboard.append([KeyboardButton(f"{sub_cat} ({stock_count})")])
+        
+    keyboard.append([BACK_TO_CATEGORIES])
+    keyboard.append([BACK_TO_MAIN])
+
+    await update.message.reply_text(
+        f"🛒 Choose sub-category for **{main_cat}**:",
+        reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+    )
+    return BUY_SUB_MENU
+
+async def receive_quantity(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await check_subscription(update, context):
+        return ConversationHandler.END
+
+    qty = update.message.text.strip()
+
+    if qty == "🔙 Back to Sub-Categories":
+        return await back_to_subcategories(update, context)
+    if qty == "🔙 Back to Main Menu":
+        return await back_to_main(update, context)
+    
+    if not qty.isdigit():
+        await update.message.reply_text(
+            "❌ Please enter a valid number.",
+            reply_markup=ReplyKeyboardMarkup([[BACK_TO_SUB_CATEGORIES], [BACK_TO_MAIN]], resize_keyboard=True)
+        )
+        return GET_QUANTITY
+        
+    qty = int(qty)
+    order = context.user_data.get("order", {})
+    order["qty"] = qty
+    
+    main_cat = order['main_cat']
+    sub_cat = order['sub_cat']
+    
+    price_per_item = prices.get(main_cat, {}).get(sub_cat, 0)
+    total_price = price_per_item * qty
+    
+    order["price"] = total_price
+    context.user_data["order"] = order
+
+    is_manual = main_cat in MANUAL_DELIVERY_CATEGORIES
+
+    if not is_manual:
+        user_id = update.effective_user.id
+        current_balance = balances.get(user_id, 0)
+    
+        if current_balance >= total_price:
+            keyboard = [
+                [KeyboardButton("✅ Confirm Purchase")],
+                [BACK_TO_SUB_CATEGORIES],
+                [BACK_TO_MAIN]
+            ]
+            await update.message.reply_text(
+                f"✅ Order created.\n"
+                f"Category: {order['sub_cat']}\n"
+                f"Quantity: {order['qty']}\n"
+                f"Total Price: {total_price} Taka\n"
+                f"Your balance: {current_balance} Taka\n\n"
+                f"Click `✅ Confirm Purchase` to pay from balance.",
+                reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+            )
+        else:
+            await update.message.reply_text(
+                f"❌ Insufficient balance. You need {total_price} Taka but have {current_balance} Taka.",
+                reply_markup=ReplyKeyboardMarkup([[BACK_TO_SUB_CATEGORIES], [BACK_TO_MAIN]], resize_keyboard=True)
+            )
+            return BUY_SUB_MENU
+            
+        return WAIT_SCREENSHOT
+    
+    keyboard = [
+        [BACK_TO_SUB_CATEGORIES],
+        [BACK_TO_MAIN]
+    ]
+    await update.message.reply_text(
+        f"✅ Order created.\n"
+        f"Category: {order['sub_cat']}\n"
+        f"Quantity: {order['qty']}\n"
+        f"Total Price: {total_price} Taka\n"
+        f"⚠️ Please send payment to:\n{payment_info}\n\n"
+        f"📸 Send a screenshot after payment.",
+        reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+    )
+    return WAIT_SCREENSHOT
+
+async def user_send_screenshot(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await check_subscription(update, context):
+        return ConversationHandler.END
+
+    if update.message.text == "🔙 Back to Sub-Categories":
+        return await back_to_subcategories(update, context)
+    if update.message.text == "🔙 Back to Main Menu":
+        return await back_to_main(update, context)
+
+    order = context.user_data.get("order", {})
+    if not order:
+        return ConversationHandler.END
+        
+    main_cat = order['main_cat']
+    sub_cat = order['sub_cat']
+
+    if update.message.text == "✅ Confirm Purchase" and main_cat not in MANUAL_DELIVERY_CATEGORIES:
+        user_id = update.effective_user.id
+        total_price = order['price']
+        qty = order['qty']
+        current_balance = balances.get(user_id, 0)
+        
+        if current_balance >= total_price:
+            balances[user_id] = current_balance - total_price
+            
+            items = pop_items_from_excel(main_cat, sub_cat, qty)
+            if not items:
+                balances[user_id] = balances.get(user_id, 0) + total_price
+                await update.message.reply_text(
+                    "❌ Not enough items in stock. Your balance has been refunded.",
+                    reply_markup=ReplyKeyboardRemove()
+                )
+                return await back_to_main(update, context)
+            
+            global total_sales, sales_count_per_category, transaction_log, user_sales
+            total_sales += total_price
+            sales_count_per_category[sub_cat] = sales_count_per_category.get(sub_cat, 0) + qty
+            transaction_log.append(('sale', user_id, total_price, time.time()))
+            user_sales[user_id] = user_sales.get(user_id, 0) + total_price
+
+            item_text = "\n".join(items)
+            await context.bot.send_message(
+                chat_id=user_id,
+                text=f"✅ Your order:\n{item_text}"
+            )
+
+            await update.message.reply_text(
+                "✅ Order completed successfully!",
+                reply_markup=ReplyKeyboardRemove()
+            )
+            context.user_data.clear()
+            save_user_data()
+            return await back_to_main(update, context)
+        else:
+            await update.message.reply_text(
+                "❌ Insufficient balance.",
+                reply_markup=ReplyKeyboardRemove()
+            )
+            return await back_to_main(update, context)
+
+    if not update.message.photo:
+        await update.message.reply_text(
+            "❌ Please send a photo.",
+            reply_markup=ReplyKeyboardMarkup([[BACK_TO_SUB_CATEGORIES], [BACK_TO_MAIN]], resize_keyboard=True)
+        )
+        return WAIT_SCREENSHOT
+        
+    user = update.effective_user
+    username = user.username if user.username else 'N/A'
+    caption = (
+        f"🔔 **New Order!** 🔔\n"
+        f"User: @{username}\n"
+        f"Category: {order['sub_cat']}\n"
+        f"Quantity: {order['qty']}\n"
+        f"Price: {order['price']}\n"
+        f"UserID: {user.id}"
+    )
+
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("✅ Confirm Order", callback_data=f"confirm_manual:{user.id}:{order['main_cat']}:{order['sub_cat']}:{order['qty']}:{order['price']}"),
+         InlineKeyboardButton("❌ Cancel Order", callback_data=f"cancel_manual:{user.id}")]
+    ])
+    
+    await context.bot.send_photo(
+        chat_id=ADMIN_ID,
+        photo=update.message.photo[-1].file_id,
+        caption=caption,
+        reply_markup=keyboard
+    )
+    
+    await update.message.reply_text("✅ Screenshot sent to admin.")
+    await back_to_main(update, context)
+    context.user_data.clear()
+    return MAIN_MENU
+
+# ================ DEPOSIT HANDLERS ================
+async def deposit_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    amount_str = update.message.text.strip()
+
+    if amount_str == "🔙 Back to Main Menu":
+        return await back_to_main(update, context)
+
+    if not amount_str.isdigit():
+        await update.message.reply_text(
+            "❌ Please enter a valid number.",
+            reply_markup=ReplyKeyboardMarkup([[BACK_TO_MAIN]], resize_keyboard=True)
+        )
+        return DEPOSIT
+
+    amount = int(amount_str)
+    context.user_data["deposit_amount"] = amount
+    
+    await update.message.reply_text(
+        f"💳 Please send {amount} Taka to:\n{payment_info}\n\n"
+        f"📸 Send a screenshot after payment.",
+        reply_markup=ReplyKeyboardMarkup([[BACK_TO_MAIN]], resize_keyboard=True)
+    )
+    return GET_DEPOSIT_AMOUNT
+
+async def receive_deposit_screenshot(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.message.text == "🔙 Back to Main Menu":
+        return await back_to_main(update, context)
+
+    if not update.message.photo:
+        await update.message.reply_text(
+            "❌ Please send a photo.",
+            reply_markup=ReplyKeyboardMarkup([[BACK_TO_MAIN]], resize_keyboard=True)
+        )
+        return GET_DEPOSIT_AMOUNT
+    
+    user = update.effective_user
+    deposit_amount = context.user_data.get("deposit_amount", 0)
+    
+    username = user.username if user.username else 'N/A'
+    caption = (
+        f"🔔 **New Deposit Request!** 🔔\n"
+        f"User: @{username}\n"
+        f"Amount: {deposit_amount}\n"
+        f"UserID: {user.id}"
+    )
+
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("✅ Confirm Deposit", callback_data=f"deposit_confirm:{user.id}:{deposit_amount}"),
+         InlineKeyboardButton("❌ Cancel Deposit", callback_data=f"deposit_cancel:{user.id}")]
+    ])
+
+    await context.bot.send_photo(
+        chat_id=ADMIN_ID,
+        photo=update.message.photo[-1].file_id,
+        caption=caption,
+        reply_markup=keyboard
+    )
+    
+    await update.message.reply_text(
+        "✅ Your deposit request has been sent to admin.",
+        reply_markup=get_main_menu_keyboard(user.id)
+    )
+    
+    context.user_data.clear()
+    return MAIN_MENU
+
+# ================ ADMIN PANEL HANDLERS ================
+async def admin_panel_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ADMIN_ID:
+        return ConversationHandler.END
+
+    text = update.message.text
+    
+    if text == "🔙 Back to Main Menu":
+        return await back_to_main(update, context)
+    
+    if text == "🔄 Refresh Dashboard":
+        return await show_dashboard(update, context)
+    
+    if text == "👥 User Profile":
+        return await view_user_profile(update, context)
+
+    if text == "✏️ Edit User Balance":
+        return await edit_user_balance_start(update, context)
+    
+    if text == "✏️ Edit User Info":
+        return await edit_user_info_start(update, context)
+        
+    if text == "📢 Send Notice":
+        await update.message.reply_text(
+            "✍️ Enter the notice message:",
+            reply_markup=ReplyKeyboardMarkup([[BACK_TO_ADMIN]], resize_keyboard=True)
+        )
+        return SEND_NOTICE
+        
+    if text == "📂 Manage Categories":
+        keyboard = []
+        for cat in categories.keys():
+            stock_count = get_total_stock(cat)
+            keyboard.append([KeyboardButton(f"{cat} ({stock_count})")])
+        
+        keyboard.append([KeyboardButton("➕ Add Main Category")])
+        keyboard.append([KeyboardButton("➖ Remove Main Category")])
+        keyboard.append([BACK_TO_ADMIN])
+        await update.message.reply_text(
+            "⚙️ Manage Main Categories:",
+            reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+        )
+        return MANAGE_CATEGORY
+
+    if text == "💰 Edit Price":
+        keyboard = [[KeyboardButton(cat)] for cat in categories.keys()]
+        keyboard.append([BACK_TO_ADMIN])
+        await update.message.reply_text(
+            "✍️ Which category price to edit?",
+            reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+        )
+        return EDIT_PRICE_MAIN
+
+    if text == "💳 Edit Payment Info":
+        await update.message.reply_text(
+            "✍️ Enter new payment info:",
+            reply_markup=ReplyKeyboardMarkup([[BACK_TO_ADMIN]], resize_keyboard=True)
+        )
+        return EDIT_PAYMENT
+        
+    if text == "💳 Manage Payment Categories":
+        return await manage_payment_categories_handler(update, context)
+         
     return ADMIN_PANEL
 
 # ================ USER PROFILE VIEW ================
@@ -795,410 +1167,6 @@ async def receive_balance_edit_amount(update: Update, context: ContextTypes.DEFA
     context.user_data.pop('edit_balance_user_id', None)
     context.user_data.pop('balance_edit_action', None)
     return await show_dashboard(update, context)
-
-# ================ DEPOSIT ================
-async def deposit_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    amount_str = update.message.text.strip()
-
-    if amount_str == "🔙 Back to Main Menu":
-        return await back_to_main(update, context)
-
-    if not amount_str.isdigit():
-        await update.message.reply_text(
-            "❌ Please enter a valid number.",
-            reply_markup=ReplyKeyboardMarkup([[BACK_TO_MAIN]], resize_keyboard=True)
-        )
-        return DEPOSIT
-
-    amount = int(amount_str)
-    context.user_data["deposit_amount"] = amount
-    
-    await update.message.reply_text(
-        f"💳 Please send {amount} Taka to:\n{payment_info}\n\n"
-        f"📸 Send a screenshot after payment.",
-        reply_markup=ReplyKeyboardMarkup([[BACK_TO_MAIN]], resize_keyboard=True)
-    )
-    return GET_DEPOSIT_AMOUNT
-
-async def receive_deposit_screenshot(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.message.text == "🔙 Back to Main Menu":
-        return await back_to_main(update, context)
-
-    if not update.message.photo:
-        await update.message.reply_text(
-            "❌ Please send a photo.",
-            reply_markup=ReplyKeyboardMarkup([[BACK_TO_MAIN]], resize_keyboard=True)
-        )
-        return GET_DEPOSIT_AMOUNT
-    
-    user = update.effective_user
-    deposit_amount = context.user_data.get("deposit_amount", 0)
-    
-    username = user.username if user.username else 'N/A'
-    caption = (
-        f"🔔 **New Deposit Request!** 🔔\n"
-        f"User: @{username}\n"
-        f"Amount: {deposit_amount}\n"
-        f"UserID: {user.id}"
-    )
-
-    keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("✅ Confirm Deposit", callback_data=f"deposit_confirm:{user.id}:{deposit_amount}"),
-         InlineKeyboardButton("❌ Cancel Deposit", callback_data=f"deposit_cancel:{user.id}")]
-    ])
-
-    await context.bot.send_photo(
-        chat_id=ADMIN_ID,
-        photo=update.message.photo[-1].file_id,
-        caption=caption,
-        reply_markup=keyboard
-    )
-    
-    await update.message.reply_text(
-        "✅ Your deposit request has been sent to admin.",
-        reply_markup=get_main_menu_keyboard(user.id)
-    )
-    
-    context.user_data.clear()
-    return MAIN_MENU
-
-# ================ BUY HANDLERS ================
-async def user_choose_category(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await check_subscription(update, context):
-        return ConversationHandler.END
-        
-    text = update.message.text.strip()
-    original_cat = text.split(" (")[0]
-    
-    if original_cat == "🔙 Back to Main Menu":
-        return await back_to_main(update, context)
-
-    context.user_data.clear()
-
-    if original_cat in categories.keys():
-        context.user_data["temp_main_cat_for_buy"] = original_cat
-        
-        keyboard = []
-        for sub_cat in categories[original_cat]:
-            stock_count = count_items(original_cat, sub_cat)
-            keyboard.append([KeyboardButton(f"{sub_cat} ({stock_count})")])
-        
-        keyboard.append([BACK_TO_CATEGORIES])
-        keyboard.append([BACK_TO_MAIN])
-        
-        await update.message.reply_text(
-            f"🛒 Choose sub-category for **{original_cat}**:",
-            reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-        )
-        return BUY_SUB_MENU
-
-    await update.message.reply_text("❌ Category not found.")
-    return BUY_MENU
-
-async def user_choose_subcategory(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await check_subscription(update, context):
-        return ConversationHandler.END
-        
-    text = update.message.text.strip()
-    original_sub_cat = text.split(" (")[0]
-    main_cat = context.user_data.get('temp_main_cat_for_buy')
-    
-    if text == "🔙 Back to Categories":
-        return await back_to_categories(update, context)
-    if text == "🔙 Back to Main Menu":
-        return await back_to_main(update, context)
-        
-    if main_cat and original_sub_cat in categories.get(main_cat, []):
-        context.user_data["order"] = {"main_cat": main_cat, "sub_cat": original_sub_cat}
-        
-        price = prices.get(main_cat, {}).get(original_sub_cat, "Price not set yet.")
-        
-        keyboard = [
-            [BACK_TO_SUB_CATEGORIES],
-            [BACK_TO_MAIN]
-        ]
-        
-        await update.message.reply_text(
-            f"✅ You selected **{original_sub_cat}**.\n💰 **Price per item:** {price} Taka\n\n"
-            f"✍️ Enter quantity:",
-            reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-        )
-        return GET_QUANTITY
-
-    await update.message.reply_text("❌ Sub-category not found.")
-    return BUY_SUB_MENU
-
-async def back_to_categories(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await check_subscription(update, context):
-        return ConversationHandler.END
-
-    keyboard = []
-    for cat in categories.keys():
-        keyboard.append([KeyboardButton(cat)])
-    keyboard.append([BACK_TO_MAIN])
-    await update.message.reply_text(
-        "🛒 Choose a category:",
-        reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-    )
-    return BUY_MENU
-
-async def back_to_subcategories(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await check_subscription(update, context):
-        return ConversationHandler.END
-    
-    main_cat = context.user_data.get('temp_main_cat_for_buy')
-    if not main_cat:
-        return await back_to_categories(update, context)
-        
-    keyboard = []
-    for sub_cat in categories[main_cat]:
-        stock_count = count_items(main_cat, sub_cat)
-        keyboard.append([KeyboardButton(f"{sub_cat} ({stock_count})")])
-        
-    keyboard.append([BACK_TO_CATEGORIES])
-    keyboard.append([BACK_TO_MAIN])
-
-    await update.message.reply_text(
-        f"🛒 Choose sub-category for **{main_cat}**:",
-        reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-    )
-    return BUY_SUB_MENU
-
-async def receive_quantity(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await check_subscription(update, context):
-        return ConversationHandler.END
-
-    qty = update.message.text.strip()
-
-    if qty == "🔙 Back to Sub-Categories":
-        return await back_to_subcategories(update, context)
-    if qty == "🔙 Back to Main Menu":
-        return await back_to_main(update, context)
-    
-    if not qty.isdigit():
-        await update.message.reply_text(
-            "❌ Please enter a valid number.",
-            reply_markup=ReplyKeyboardMarkup([[BACK_TO_SUB_CATEGORIES], [BACK_TO_MAIN]], resize_keyboard=True)
-        )
-        return GET_QUANTITY
-        
-    qty = int(qty)
-    order = context.user_data.get("order", {})
-    order["qty"] = qty
-    
-    main_cat = order['main_cat']
-    sub_cat = order['sub_cat']
-    
-    price_per_item = prices.get(main_cat, {}).get(sub_cat, 0)
-    total_price = price_per_item * qty
-    
-    order["price"] = total_price
-    context.user_data["order"] = order
-
-    is_manual = main_cat in MANUAL_DELIVERY_CATEGORIES
-
-    if not is_manual:
-        user_id = update.effective_user.id
-        current_balance = balances.get(user_id, 0)
-    
-        if current_balance >= total_price:
-            keyboard = [
-                [KeyboardButton("✅ Confirm Purchase")],
-                [BACK_TO_SUB_CATEGORIES],
-                [BACK_TO_MAIN]
-            ]
-            await update.message.reply_text(
-                f"✅ Order created.\n"
-                f"Category: {order['sub_cat']}\n"
-                f"Quantity: {order['qty']}\n"
-                f"Total Price: {total_price} Taka\n"
-                f"Your balance: {current_balance} Taka\n\n"
-                f"Click `✅ Confirm Purchase` to pay from balance.",
-                reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-            )
-        else:
-            await update.message.reply_text(
-                f"❌ Insufficient balance. You need {total_price} Taka but have {current_balance} Taka.",
-                reply_markup=ReplyKeyboardMarkup([[BACK_TO_SUB_CATEGORIES], [BACK_TO_MAIN]], resize_keyboard=True)
-            )
-            return BUY_SUB_MENU
-            
-        return WAIT_SCREENSHOT
-    
-    keyboard = [
-        [BACK_TO_SUB_CATEGORIES],
-        [BACK_TO_MAIN]
-    ]
-    await update.message.reply_text(
-        f"✅ Order created.\n"
-        f"Category: {order['sub_cat']}\n"
-        f"Quantity: {order['qty']}\n"
-        f"Total Price: {total_price} Taka\n"
-        f"⚠️ Please send payment to:\n{payment_info}\n\n"
-        f"📸 Send a screenshot after payment.",
-        reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-    )
-    return WAIT_SCREENSHOT
-
-async def user_send_screenshot(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await check_subscription(update, context):
-        return ConversationHandler.END
-
-    if update.message.text == "🔙 Back to Sub-Categories":
-        return await back_to_subcategories(update, context)
-    if update.message.text == "🔙 Back to Main Menu":
-        return await back_to_main(update, context)
-
-    order = context.user_data.get("order", {})
-    if not order:
-        return ConversationHandler.END
-        
-    main_cat = order['main_cat']
-    sub_cat = order['sub_cat']
-
-    if update.message.text == "✅ Confirm Purchase" and main_cat not in MANUAL_DELIVERY_CATEGORIES:
-        user_id = update.effective_user.id
-        total_price = order['price']
-        qty = order['qty']
-        current_balance = balances.get(user_id, 0)
-        
-        if current_balance >= total_price:
-            balances[user_id] = current_balance - total_price
-            
-            items = pop_items_from_excel(main_cat, sub_cat, qty)
-            if not items:
-                balances[user_id] = balances.get(user_id, 0) + total_price
-                await update.message.reply_text(
-                    "❌ Not enough items in stock. Your balance has been refunded.",
-                    reply_markup=ReplyKeyboardRemove()
-                )
-                return await back_to_main(update, context)
-            
-            global total_sales, sales_count_per_category, transaction_log, user_sales
-            total_sales += total_price
-            sales_count_per_category[sub_cat] = sales_count_per_category.get(sub_cat, 0) + qty
-            transaction_log.append(('sale', user_id, total_price, time.time()))
-            user_sales[user_id] = user_sales.get(user_id, 0) + total_price
-
-            item_text = "\n".join(items)
-            await context.bot.send_message(
-                chat_id=user_id,
-                text=f"✅ Your order:\n{item_text}"
-            )
-
-            await update.message.reply_text(
-                "✅ Order completed successfully!",
-                reply_markup=ReplyKeyboardRemove()
-            )
-            context.user_data.clear()
-            save_user_data()
-            return await back_to_main(update, context)
-        else:
-            await update.message.reply_text(
-                "❌ Insufficient balance.",
-                reply_markup=ReplyKeyboardRemove()
-            )
-            return await back_to_main(update, context)
-
-    if not update.message.photo:
-        await update.message.reply_text(
-            "❌ Please send a photo.",
-            reply_markup=ReplyKeyboardMarkup([[BACK_TO_SUB_CATEGORIES], [BACK_TO_MAIN]], resize_keyboard=True)
-        )
-        return WAIT_SCREENSHOT
-        
-    user = update.effective_user
-    username = user.username if user.username else 'N/A'
-    caption = (
-        f"🔔 **New Order!** 🔔\n"
-        f"User: @{username}\n"
-        f"Category: {order['sub_cat']}\n"
-        f"Quantity: {order['qty']}\n"
-        f"Price: {order['price']}\n"
-        f"UserID: {user.id}"
-    )
-
-    keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("✅ Confirm Order", callback_data=f"confirm_manual:{user.id}:{order['main_cat']}:{order['sub_cat']}:{order['qty']}:{order['price']}"),
-         InlineKeyboardButton("❌ Cancel Order", callback_data=f"cancel_manual:{user.id}")]
-    ])
-    
-    await context.bot.send_photo(
-        chat_id=ADMIN_ID,
-        photo=update.message.photo[-1].file_id,
-        caption=caption,
-        reply_markup=keyboard
-    )
-    
-    await update.message.reply_text("✅ Screenshot sent to admin.")
-    await back_to_main(update, context)
-    context.user_data.clear()
-    return MAIN_MENU
-
-# ================ ADMIN PANEL HANDLERS ================
-async def admin_panel_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != ADMIN_ID:
-        return ConversationHandler.END
-
-    text = update.message.text
-    
-    if text == "🔙 Back to Main Menu":
-        return await back_to_main(update, context)
-    
-    if text == "🔄 Refresh Dashboard":
-        return await show_dashboard(update, context)
-    
-    if text == "👥 User Profile":
-        return await view_user_profile(update, context)
-
-    if text == "✏️ Edit User Balance":
-        return await edit_user_balance_start(update, context)
-    
-    if text == "✏️ Edit User Info":
-        return await edit_user_info_start(update, context)
-        
-    if text == "📢 Send Notice":
-        await update.message.reply_text(
-            "✍️ Enter the notice message:",
-            reply_markup=ReplyKeyboardMarkup([[BACK_TO_ADMIN]], resize_keyboard=True)
-        )
-        return SEND_NOTICE
-        
-    if text == "📂 Manage Categories":
-        keyboard = []
-        for cat in categories.keys():
-            stock_count = get_total_stock(cat)
-            keyboard.append([KeyboardButton(f"{cat} ({stock_count})")])
-        
-        keyboard.append([KeyboardButton("➕ Add Main Category")])
-        keyboard.append([KeyboardButton("➖ Remove Main Category")])
-        keyboard.append([BACK_TO_ADMIN])
-        await update.message.reply_text(
-            "⚙️ Manage Main Categories:",
-            reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-        )
-        return MANAGE_CATEGORY
-
-    if text == "💰 Edit Price":
-        keyboard = [[KeyboardButton(cat)] for cat in categories.keys()]
-        keyboard.append([BACK_TO_ADMIN])
-        await update.message.reply_text(
-            "✍️ Which category price to edit?",
-            reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-        )
-        return EDIT_PRICE_MAIN
-
-    if text == "💳 Edit Payment Info":
-        await update.message.reply_text(
-            "✍️ Enter new payment info:",
-            reply_markup=ReplyKeyboardMarkup([[BACK_TO_ADMIN]], resize_keyboard=True)
-        )
-        return EDIT_PAYMENT
-        
-    if text == "💳 Manage Payment Categories":
-        return await manage_payment_categories_handler(update, context)
-         
-    return ADMIN_PANEL
 
 # ================ SEND NOTICE ================
 async def send_notice_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1842,10 +1810,14 @@ async def admin_deposit_action(update: Update, context: ContextTypes.DEFAULT_TYP
         except Exception as e:
             logger.error(f"Failed to edit message: {e}")
 
-# ================ MAIN =================
+# ================ MAIN FUNCTION ================
 def main():
-    app = ApplicationBuilder().token(BOT_TOKEN).build()
-
+    global application
+    
+    # Application তৈরি করুন
+    application = Application.builder().token(BOT_TOKEN).build()
+    
+    # Conversation Handler তৈরি করুন
     conv = ConversationHandler(
         entry_points=[
             CommandHandler("start", start),
@@ -1975,14 +1947,22 @@ def main():
         fallbacks=[CommandHandler("start", start)]
     )
 
-    app.add_handler(conv)
-    app.add_handler(CallbackQueryHandler(admin_order_action, pattern="^(confirm_manual:|cancel_manual:|force_confirm:)"))
-    app.add_handler(CallbackQueryHandler(admin_deposit_action, pattern="^(deposit_confirm:|deposit_cancel:)"))
-    app.add_handler(CallbackQueryHandler(toggle_payment_method, pattern="^toggle_payment:"))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.Regex("🔙 Back to Main Menu"), back_to_main))
+    # Handler যোগ করুন
+    application.add_handler(conv)
+    application.add_handler(CallbackQueryHandler(admin_order_action, pattern="^(confirm_manual:|cancel_manual:|force_confirm:)"))
+    application.add_handler(CallbackQueryHandler(admin_deposit_action, pattern="^(deposit_confirm:|deposit_cancel:)"))
+    application.add_handler(CallbackQueryHandler(toggle_payment_method, pattern="^toggle_payment:"))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.Regex("🔙 Back to Main Menu"), back_to_main))
     
     logger.info("🤖 Bot running...")
-    app.run_polling()
+    
+    # Webhook এর জন্য application রিটার্ন করুন
+    return application
 
+# ================ APPLICATION START ================
 if __name__ == "__main__":
-    main()
+    application = main()
+    # Webhook mode এ চালানোর জন্য application এক্সপোর্ট করুন
+else:
+    # Import করার জন্য application তৈরি করুন
+    application = main()
