@@ -4,6 +4,8 @@ import sys
 import warnings
 warnings.filterwarnings("ignore")
 
+from flask import Flask, jsonify
+
 # Python 3.14 এর জন্য patch
 if sys.version_info >= (3, 14):
     try:
@@ -13,9 +15,8 @@ if sys.version_info >= (3, 14):
     except:
         pass
 
-from your_bot import main as run_bot  # আপনার ফাইলের নাম অনুযায়ী
-
-from flask import Flask, jsonify
+# আপনার বট ফাইল থেকে import করুন (যেহেতু আপনি bot.py নাম দিয়েছেন)
+from bot import main as run_bot
 
 app = Flask(__name__)
 
