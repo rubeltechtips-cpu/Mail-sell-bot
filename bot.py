@@ -43,7 +43,7 @@ def webhook():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 # ================ CONFIG ================
-BOT_TOKEN = "8196949746:AAHPGwCkmoA-tYPe-vXwXro-ERp6a3a4s68"
+BOT_TOKEN = "8349208659:AAEw1qJ82HZuYcNajeRjIm6v3Ns7cs7-dLU"
 ADMIN_ID = 8061006207
 ADMIN_USERNAME = "Rubel_QSB"
 CHANNEL_USERNAME = "quick_sell_bd"
