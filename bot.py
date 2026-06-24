@@ -50,8 +50,7 @@ CHANNEL_USERNAME = "quick_sell_bd"
 
 # ================ TELEGRAM STORAGE CONFIG ================
 # আপনার প্রাইভেট চ্যানেলের আইডি দিন (যেখানে ফাইল সেভ হবে)
-STORAGE_CHANNEL_ID = "1004475314398"  # আপনার চ্যানেলের আইডি দিন
-STORAGE_CHANNEL_LINK = "https://t.me/your_private_channel"  # চ্যানেল লিংক
+STORAGE_CHANNEL_ID = "--1004475314398"  # আপনার চ্যানেলের আইডি দিন
 
 # ================ LOGGER ================
 logging.basicConfig(
@@ -75,26 +74,52 @@ transaction_log = []
 dashboard_message = "স্বাগতম! এটি আপনার বটের ড্যাশবোর্ড।"
 MANUAL_DELIVERY_CATEGORIES = []
 
+# ================ STATES ================
+(
+    BUY_MENU,
+    BUY_SUB_MENU,
+    ADMIN_PANEL,
+    ADD_MAIN_CAT,
+    REMOVE_MAIN_CAT,
+    MANAGE_CATEGORY,
+    MANAGE_SUB_CATEGORY,
+    ADD_SUB_CAT,
+    REMOVE_SUB_CAT,
+    ADD_ITEMS,
+    EDIT_PAYMENT,
+    EDIT_PRICE_MAIN,
+    EDIT_PRICE_SUB,
+    RECEIVE_NEW_PRICE,
+    GET_QUANTITY,
+    WAIT_SCREENSHOT,
+    DEPOSIT,
+    GET_DEPOSIT_AMOUNT,
+    DASHBOARD,
+    SEND_NOTICE,
+    VIEW_USER_PROFILE,
+    SEARCH_USER_PROFILE,
+    MANAGE_PAYMENT_CATEGORIES,
+    SEARCH_USER_FOR_BALANCE,
+    BALANCE_EDIT_ACTION,
+    RECEIVE_BALANCE_EDIT_AMOUNT
+) = range(26)
+
 # ================ TELEGRAM STORAGE FUNCTIONS ================
 
 async def send_file_to_channel(file_content: bytes, filename: str, bot):
     """Send a file to the private Telegram channel for storage"""
     try:
-        # Create an InputFile from bytes
         file_obj = io.BytesIO(file_content)
         file_obj.name = filename
         
-        # Send document to channel
         message = await bot.send_document(
             chat_id=STORAGE_CHANNEL_ID,
             document=file_obj,
             caption=f"📁 File: {filename}\n🕐 Time: {time.strftime('%Y-%m-%d %H:%M:%S')}"
         )
         
-        # Store file_id for later retrieval
         file_id = message.document.file_id
         
-        # Store file info in a JSON file
         file_info_path = "file_info.json"
         if os.path.exists(file_info_path):
             with open(file_info_path, 'r') as f:
@@ -132,11 +157,7 @@ async def get_file_from_channel(filename: str, bot):
             return None
         
         file_id = file_info[filename]["file_id"]
-        
-        # Get the file from Telegram
         file_obj = await bot.get_file(file_id)
-        
-        # Download file content
         file_content = await file_obj.download_as_bytearray()
         
         return file_content
@@ -147,7 +168,6 @@ async def get_file_from_channel(filename: str, bot):
 async def save_all_data_to_channel(bot):
     """Save all data files to Telegram channel"""
     try:
-        # Save user_data.json
         with open("user_data.json", "w", encoding='utf-8') as f:
             data = {
                 "balances": balances,
@@ -164,12 +184,10 @@ async def save_all_data_to_channel(bot):
             }
             json.dump(data, f, ensure_ascii=False, indent=4)
         
-        # Upload user_data.json
         with open("user_data.json", "rb") as f:
             content = f.read()
             await send_file_to_channel(content, "user_data.json", bot)
         
-        # Upload all Excel files
         if os.path.exists("categories"):
             for file in os.listdir("categories"):
                 if file.endswith(".xlsx"):
@@ -178,7 +196,6 @@ async def save_all_data_to_channel(bot):
                         content = f.read()
                         await send_file_to_channel(content, f"categories/{file}", bot)
         
-        # Upload file_info.json if exists
         if os.path.exists("file_info.json"):
             with open("file_info.json", "rb") as f:
                 content = f.read()
@@ -193,7 +210,6 @@ async def save_all_data_to_channel(bot):
 async def restore_all_data_from_channel(bot):
     """Restore all data from Telegram channel"""
     try:
-        # Restore user_data.json
         file_content = await get_file_from_channel("user_data.json", bot)
         if file_content:
             with open("user_data.json", "wb") as f:
@@ -201,13 +217,11 @@ async def restore_all_data_from_channel(bot):
             load_user_data()
             logger.info("Restored user_data.json from channel")
         
-        # Restore Excel files
         file_info_path = "file_info.json"
         if os.path.exists(file_info_path):
             with open(file_info_path, 'r') as f:
                 file_info = json.load(f)
             
-            # Create categories directory
             os.makedirs("categories", exist_ok=True)
             
             for filename, info in file_info.items():
@@ -379,8 +393,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "id": user_id
         }
         save_user_data()
-        
-        # Auto-save to channel when new user registers
         await save_all_data_to_channel(context.bot)
 
     current_balance = balances.get(user_id, 0)
@@ -453,7 +465,6 @@ async def show_dashboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     global total_deposits, total_sales, balances, sales_count_per_category, user_info, transaction_log, dashboard_message
 
-    total_balance = sum(balances.values())
     total_users_count = len(user_info)
     
     stock_info = ""
@@ -477,12 +488,12 @@ async def show_dashboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
             user_data = user_info.get(user_id, {})
             
             username_raw = user_data.get("username")
-            username = (username_raw if username_raw is not None else "N/A").replace('_', '\\_') 
+            username = (username_raw if username_raw is not None else "N/A")
             
             if trans_type == 'deposit':
-                recent_transactions += f"  - 💸 ডিপোজিট: {amount} (ব্যবহারকারী: <code>@{username}</code>) at {date_str}\n" 
+                recent_transactions += f"  - 💸 ডিপোজিট: {amount} (ব্যবহারকারী: @{username}) at {date_str}\n" 
             elif trans_type == 'sale':
-                recent_transactions += f"  - 🛒 বিক্রয়: {amount} (ব্যবহারকারী: <code>@{username}</code>) at {date_str}\n"
+                recent_transactions += f"  - 🛒 বিক্রয়: {amount} (ব্যবহারকারী: @{username}) at {date_str}\n"
     else:
         recent_transactions = "  - কোনো সাম্প্রতিক লেনদেন নেই।\n"
     
@@ -587,12 +598,12 @@ async def search_and_show_user_profile(update: Update, context: ContextTypes.DEF
     full_name = user_data.get("first_name", "") + (f" {user_data['last_name']}" if user_data.get("last_name") else "")
 
     username_raw = user_data.get('username')
-    username_safe = (username_raw or 'N/A').replace('<', '&lt;').replace('>', '&gt;')
+    username_safe = (username_raw or 'N/A')
     
     profile_text = (
         f"👤 <b>ব্যবহারকারী প্রোফাইল:</b>\n"
         f"নাম: {full_name}\n"
-        f"Username: <code>@{username_safe}</code>\n"
+        f"Username: @{username_safe}\n"
         f"ID: <code>{found_user_id}</code>\n"
         "---------------------------\n"
         f"💰 <b>বর্তমান ব্যালেন্স:</b> {balance} টাকা\n"
@@ -617,10 +628,6 @@ async def search_and_show_user_profile(update: Update, context: ContextTypes.DEF
     await update.message.reply_text(profile_text, parse_mode='HTML', reply_markup=ReplyKeyboardMarkup([[KeyboardButton("🔙 অ্যাডমিন প্যানেল")]], resize_keyboard=True))
     
     return SEARCH_USER_PROFILE
-
-# =========================================================
-# ================ BALANCE EDIT HANDLERS ===============
-# =========================================================
 
 async def edit_user_balance_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
@@ -761,8 +768,6 @@ async def receive_balance_edit_amount(update: Update, context: ContextTypes.DEFA
         admin_message = f"✅ ব্যবহারকারীর নতুন ব্যালেন্স {new_balance} টাকা সেট করা হয়েছে।"
 
     save_user_data()
-    
-    # Save to channel after balance update
     await save_all_data_to_channel(context.bot)
 
     try:
@@ -1771,51 +1776,17 @@ async def admin_deposit_action(update: Update, context: ContextTypes.DEFAULT_TYP
                 text=f"⚠️ Failed to update deposit cancellation message. User ID: {uid}"
             )
 
-# ================ STATES ================
-(
-    BUY_MENU,
-    BUY_SUB_MENU,
-    ADMIN_PANEL,
-    ADD_MAIN_CAT,
-    REMOVE_MAIN_CAT,
-    MANAGE_CATEGORY,
-    MANAGE_SUB_CATEGORY,
-    ADD_SUB_CAT,
-    REMOVE_SUB_CAT,
-    ADD_ITEMS,
-    EDIT_PAYMENT,
-    EDIT_PRICE_MAIN,
-    EDIT_PRICE_SUB,
-    RECEIVE_NEW_PRICE,
-    GET_QUANTITY,
-    WAIT_SCREENSHOT,
-    DEPOSIT,
-    GET_DEPOSIT_AMOUNT,
-    DASHBOARD,
-    SEND_NOTICE,
-    VIEW_USER_PROFILE,
-    SEARCH_USER_PROFILE,
-    MANAGE_PAYMENT_CATEGORIES,
-    SEARCH_USER_FOR_BALANCE,
-    BALANCE_EDIT_ACTION,
-    RECEIVE_BALANCE_EDIT_AMOUNT
-) = range(26)
+# ================ BOT APPLICATION ================
+bot_app = None
 
-# ================ MAIN =================
-
-async def initialize_and_run():
-    """Initialize bot and run it"""
+def setup_bot():
+    """Setup and return the bot application with all handlers"""
     global bot_app
     
     # Create bot application
     bot_app = ApplicationBuilder().token(BOT_TOKEN).build()
-    
-    # Try to restore data from channel
-    await restore_all_data_from_channel(bot_app.bot)
-    
-    # Load local data as fallback
-    load_user_data()
 
+    # Conversation handler
     conv = ConversationHandler(
         entry_points=[
             CommandHandler("start", start),
@@ -1940,26 +1911,64 @@ async def initialize_and_run():
     bot_app.add_handler(CallbackQueryHandler(toggle_payment_method, pattern="^toggle_payment:"))
     bot_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.Regex("🔙 Back to Main Menu"), start))
     
-    logger.info("🤖 Bot running...")
+    return bot_app
+
+# ================ MAIN ================
+
+async def run_bot():
+    """Initialize and run the bot"""
+    global bot_app
     
-    # Run bot with webhook or polling
+    # Setup bot
+    bot_app = setup_bot()
+    
+    # Try to restore data from channel
+    try:
+        await restore_all_data_from_channel(bot_app.bot)
+        logger.info("Data restored from Telegram channel")
+    except Exception as e:
+        logger.error(f"Failed to restore data: {e}")
+    
+    # Load local data as fallback
+    load_user_data()
+    
+    # Start bot with webhook or polling
     if os.environ.get('RENDER'):
         # Use webhook for Render
-        webhook_url = os.environ.get('WEBHOOK_URL', 'https://your-app.onrender.com/webhook')
+        webhook_url = os.environ.get('WEBHOOK_URL', 'https://mail-sell-bot.onrender.com/webhook')
         await bot_app.bot.set_webhook(webhook_url)
-        await bot_app.run_webhook(listen='0.0.0.0', port=int(os.environ.get('PORT', 5000)), url_path='webhook')
+        logger.info(f"Webhook set to: {webhook_url}")
+        
+        # Run webhook
+        port = int(os.environ.get('PORT', 5000))
+        await bot_app.run_webhook(
+            listen='0.0.0.0',
+            port=port,
+            url_path='webhook',
+            webhook_url=webhook_url
+        )
     else:
         # Use polling for local development
         await bot_app.run_polling()
 
 def main():
-    # Start Flask server for health checks
-    if os.environ.get('RENDER'):
+    """Main entry point"""
+    # Start Flask in background thread for health checks
+    def run_flask():
         port = int(os.environ.get('PORT', 5000))
-        app.run(host='0.0.0.0', port=port, debug=False)
+        app.run(host='0.0.0.0', port=port, debug=False, use_reloader=False)
     
-    # Run the bot
-    asyncio.run(initialize_and_run())
+    # Start Flask thread
+    flask_thread = Thread(target=run_flask, daemon=True)
+    flask_thread.start()
+    
+    # Run bot
+    try:
+        asyncio.run(run_bot())
+    except KeyboardInterrupt:
+        logger.info("Bot stopped by user")
+    except Exception as e:
+        logger.error(f"Bot crashed: {e}")
 
 if __name__ == "__main__":
     main()
