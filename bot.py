@@ -29,13 +29,13 @@ def health():
     return jsonify({"status": "healthy", "message": "Bot is active"}), 200
 
 # ================ CONFIG ================
-BOT_TOKEN = "8947152509:AAHUAM7hQL0Jqar8vQlXPMVLk3My2kaWFl4"
+BOT_TOKEN = "8196949746:AAHPGwCkmoA-tYPe-vXwXro-ERp6a3a4s68"
 ADMIN_ID = 8061006207
 ADMIN_USERNAME = "Rubel_QSB"
 CHANNEL_USERNAME = "quick_sell_bd"
 
 # ================ TELEGRAM STORAGE CONFIG ================
-STORAGE_CHANNEL_ID = "-1004475314398"  # আপনার চ্যানেলের আইডি
+STORAGE_CHANNEL_ID = "-1004475314398"
 
 # ================ LOGGER ================
 logging.basicConfig(
@@ -1764,10 +1764,8 @@ def setup_bot():
     """Setup and return the bot application with all handlers"""
     global bot_app
     
-    # Create bot application
     bot_app = ApplicationBuilder().token(BOT_TOKEN).build()
 
-    # Conversation handler
     conv = ConversationHandler(
         entry_points=[
             CommandHandler("start", start),
@@ -1896,54 +1894,50 @@ def setup_bot():
 
 # ================ MAIN ================
 
+def run_bot():
+    """Run bot in a separate thread with its own event loop"""
+    global bot_app
+    
+    # Setup bot
+    bot_app = setup_bot()
+    
+    # Create new event loop for this thread
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    
+    try:
+        # Restore data from channel
+        loop.run_until_complete(restore_all_data_from_channel(bot_app.bot))
+        logger.info("Data restored from Telegram channel")
+        
+        # Load local data
+        load_user_data()
+        
+        # Delete webhook and start polling
+        loop.run_until_complete(bot_app.bot.delete_webhook())
+        logger.info("Webhook deleted, starting polling mode")
+        
+        # Start polling (this will block)
+        loop.run_until_complete(bot_app.run_polling())
+        
+    except Exception as e:
+        logger.error(f"Bot error: {e}")
+    finally:
+        loop.close()
+
 def main():
     """Main entry point"""
-    # Start Flask in background thread for health checks
+    # Start Flask in a separate thread
     def run_flask():
         port = int(os.environ.get('PORT', 5000))
         app.run(host='0.0.0.0', port=port, debug=False, use_reloader=False)
     
-    # Start Flask thread
     flask_thread = Thread(target=run_flask, daemon=True)
     flask_thread.start()
     logger.info("Flask server started on port 5000")
     
-    # Setup bot
-    global bot_app
-    bot_app = setup_bot()
-    
-    # Create new event loop for bot
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    
-    # Initialize bot in the loop
-    async def init_bot():
-        try:
-            # Restore data from channel
-            await restore_all_data_from_channel(bot_app.bot)
-            logger.info("Data restored from Telegram channel")
-            
-            # Load local data
-            load_user_data()
-            
-            # Delete webhook and start polling
-            await bot_app.bot.delete_webhook()
-            logger.info("Webhook deleted, starting polling mode")
-            
-            # Start polling
-            await bot_app.run_polling()
-        except Exception as e:
-            logger.error(f"Bot error: {e}")
-    
-    # Run bot
-    try:
-        loop.run_until_complete(init_bot())
-    except KeyboardInterrupt:
-        logger.info("Bot stopped by user")
-    except Exception as e:
-        logger.error(f"Bot crashed: {e}")
-    finally:
-        loop.close()
+    # Run bot in main thread
+    run_bot()
 
 if __name__ == "__main__":
     main()
