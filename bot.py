@@ -16,9 +16,8 @@ from telegram.ext import (
 )
 from telegram.constants import ChatMemberStatus
 from openpyxl import Workbook, load_workbook
-import requests
 
-# ================ FLASK APP FOR RENDER ================
+# ================ FLASK APP ================
 app = Flask(__name__)
 
 @app.route('/')
@@ -29,19 +28,6 @@ def home():
 def health():
     return jsonify({"status": "healthy", "message": "Bot is active"}), 200
 
-@app.route('/webhook', methods=['POST'])
-def webhook():
-    """Handle incoming webhook updates from Telegram"""
-    try:
-        update_data = request.get_json()
-        if update_data:
-            update = Update.de_json(update_data, bot_app.bot)
-            asyncio.create_task(bot_app.process_update(update))
-        return jsonify({"status": "ok"}), 200
-    except Exception as e:
-        logging.error(f"Webhook error: {e}")
-        return jsonify({"status": "error", "message": str(e)}), 500
-
 # ================ CONFIG ================
 BOT_TOKEN = "8196949746:AAHPGwCkmoA-tYPe-vXwXro-ERp6a3a4s68"
 ADMIN_ID = 8061006207
@@ -49,8 +35,7 @@ ADMIN_USERNAME = "Rubel_QSB"
 CHANNEL_USERNAME = "quick_sell_bd"
 
 # ================ TELEGRAM STORAGE CONFIG ================
-# আপনার প্রাইভেট চ্যানেলের আইডি দিন (যেখানে ফাইল সেভ হবে)
-STORAGE_CHANNEL_ID = "--1004475314398"  # আপনার চ্যানেলের আইডি দিন
+STORAGE_CHANNEL_ID = "-1004475314398"  # আপনার চ্যানেলের আইডি
 
 # ================ LOGGER ================
 logging.basicConfig(
@@ -1776,7 +1761,7 @@ async def admin_deposit_action(update: Update, context: ContextTypes.DEFAULT_TYP
                 text=f"⚠️ Failed to update deposit cancellation message. User ID: {uid}"
             )
 
-# ================ BOT APPLICATION ================
+# ================ BOT SETUP ================
 bot_app = None
 
 def setup_bot():
@@ -1932,24 +1917,13 @@ async def run_bot():
     # Load local data as fallback
     load_user_data()
     
-    # Start bot with webhook or polling
-    if os.environ.get('RENDER'):
-        # Use webhook for Render
-        webhook_url = os.environ.get('WEBHOOK_URL', 'https://mail-sell-bot.onrender.com/webhook')
-        await bot_app.bot.set_webhook(webhook_url)
-        logger.info(f"Webhook set to: {webhook_url}")
-        
-        # Run webhook
-        port = int(os.environ.get('PORT', 5000))
-        await bot_app.run_webhook(
-            listen='0.0.0.0',
-            port=port,
-            url_path='webhook',
-            webhook_url=webhook_url
-        )
-    else:
-        # Use polling for local development
-        await bot_app.run_polling()
+    # Start bot with polling (simpler and more reliable)
+    # Delete any existing webhook first
+    await bot_app.bot.delete_webhook()
+    logger.info("Webhook deleted, starting polling mode")
+    
+    # Start polling
+    await bot_app.run_polling()
 
 def main():
     """Main entry point"""
@@ -1961,8 +1935,9 @@ def main():
     # Start Flask thread
     flask_thread = Thread(target=run_flask, daemon=True)
     flask_thread.start()
+    logger.info("Flask server started on port 5000")
     
-    # Run bot
+    # Run bot with polling
     try:
         asyncio.run(run_bot())
     except KeyboardInterrupt:
