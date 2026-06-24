@@ -29,7 +29,7 @@ def health():
     return jsonify({"status": "healthy", "message": "Bot is active"}), 200
 
 # ================ CONFIG ================
-BOT_TOKEN = "8196949746:AAHPGwCkmoA-tYPe-vXwXro-ERp6a3a4s68"
+BOT_TOKEN = "8947152509:AAHUAM7hQL0Jqar8vQlXPMVLk3My2kaWFl4"
 ADMIN_ID = 8061006207
 ADMIN_USERNAME = "Rubel_QSB"
 CHANNEL_USERNAME = "quick_sell_bd"
@@ -92,7 +92,6 @@ MANUAL_DELIVERY_CATEGORIES = []
 # ================ TELEGRAM STORAGE FUNCTIONS ================
 
 async def send_file_to_channel(file_content: bytes, filename: str, bot):
-    """Send a file to the private Telegram channel for storage"""
     try:
         file_obj = io.BytesIO(file_content)
         file_obj.name = filename
@@ -129,7 +128,6 @@ async def send_file_to_channel(file_content: bytes, filename: str, bot):
         return False
 
 async def get_file_from_channel(filename: str, bot):
-    """Retrieve a file from the private Telegram channel"""
     try:
         file_info_path = "file_info.json"
         if not os.path.exists(file_info_path):
@@ -151,7 +149,6 @@ async def get_file_from_channel(filename: str, bot):
         return None
 
 async def save_all_data_to_channel(bot):
-    """Save all data files to Telegram channel"""
     try:
         with open("user_data.json", "w", encoding='utf-8') as f:
             data = {
@@ -193,7 +190,6 @@ async def save_all_data_to_channel(bot):
         return False
 
 async def restore_all_data_from_channel(bot):
-    """Restore all data from Telegram channel"""
     try:
         file_content = await get_file_from_channel("user_data.json", bot)
         if file_content:
@@ -1900,31 +1896,6 @@ def setup_bot():
 
 # ================ MAIN ================
 
-async def run_bot():
-    """Initialize and run the bot"""
-    global bot_app
-    
-    # Setup bot
-    bot_app = setup_bot()
-    
-    # Try to restore data from channel
-    try:
-        await restore_all_data_from_channel(bot_app.bot)
-        logger.info("Data restored from Telegram channel")
-    except Exception as e:
-        logger.error(f"Failed to restore data: {e}")
-    
-    # Load local data as fallback
-    load_user_data()
-    
-    # Start bot with polling (simpler and more reliable)
-    # Delete any existing webhook first
-    await bot_app.bot.delete_webhook()
-    logger.info("Webhook deleted, starting polling mode")
-    
-    # Start polling
-    await bot_app.run_polling()
-
 def main():
     """Main entry point"""
     # Start Flask in background thread for health checks
@@ -1937,13 +1908,42 @@ def main():
     flask_thread.start()
     logger.info("Flask server started on port 5000")
     
-    # Run bot with polling
+    # Setup bot
+    global bot_app
+    bot_app = setup_bot()
+    
+    # Create new event loop for bot
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    
+    # Initialize bot in the loop
+    async def init_bot():
+        try:
+            # Restore data from channel
+            await restore_all_data_from_channel(bot_app.bot)
+            logger.info("Data restored from Telegram channel")
+            
+            # Load local data
+            load_user_data()
+            
+            # Delete webhook and start polling
+            await bot_app.bot.delete_webhook()
+            logger.info("Webhook deleted, starting polling mode")
+            
+            # Start polling
+            await bot_app.run_polling()
+        except Exception as e:
+            logger.error(f"Bot error: {e}")
+    
+    # Run bot
     try:
-        asyncio.run(run_bot())
+        loop.run_until_complete(init_bot())
     except KeyboardInterrupt:
         logger.info("Bot stopped by user")
     except Exception as e:
         logger.error(f"Bot crashed: {e}")
+    finally:
+        loop.close()
 
 if __name__ == "__main__":
     main()
