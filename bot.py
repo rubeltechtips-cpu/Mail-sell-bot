@@ -1,7 +1,22 @@
+# ========== PYTHON 3.14+ PATCH ==========
+import sys
+import types
+
+if sys.version_info >= (3, 13):
+    if 'imghdr' not in sys.modules:
+        imghdr = types.ModuleType('imghdr')
+        imghdr.what = lambda f, h=None: None
+        sys.modules['imghdr'] = imghdr
+# ========== END PATCH ==========
+
 import logging
 import os
 import io
 import time
+import json
+import threading
+from http.server import HTTPServer, BaseHTTPRequestHandler
+
 from telegram import (
     Update, ReplyKeyboardMarkup, KeyboardButton, InputFile,
     ReplyKeyboardRemove, InlineKeyboardMarkup, InlineKeyboardButton
@@ -12,7 +27,40 @@ from telegram.ext import (
 )
 from telegram import ChatMember
 from openpyxl import Workbook, load_workbook
-import json
+
+# ================ HTTP SERVER FOR RENDER ================
+class HealthCheckHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        if self.path == '/':
+            self.send_response(200)
+            self.send_header('Content-type', 'text/html')
+            self.end_headers()
+            self.wfile.write(b'<h1>Bot is running!</h1><p>Status: Online</p>')
+        elif self.path == '/health':
+            self.send_response(200)
+            self.send_header('Content-type', 'application/json')
+            self.end_headers()
+            self.wfile.write(b'{"status": "ok", "message": "Bot is running"}')
+        else:
+            self.send_response(404)
+            self.end_headers()
+    
+    def log_message(self, format, *args):
+        # Suppress HTTP logs
+        pass
+
+def run_http_server():
+    try:
+        port = int(os.environ.get('PORT', 8000))
+        server = HTTPServer(('0.0.0.0', port), HealthCheckHandler)
+        logging.info(f"🌐 HTTP Server running on port {port}")
+        server.serve_forever()
+    except Exception as e:
+        logging.error(f"HTTP Server error: {e}")
+
+# Start HTTP server in a separate thread
+threading.Thread(target=run_http_server, daemon=True).start()
+# ================ END HTTP SERVER ================
 
 # ================ CONFIG ================
 BOT_TOKEN = "8349208659:AAEyJikjx1tUri_PztFGRca_lPT0WilJ0N0"
@@ -60,7 +108,10 @@ os.makedirs(EXCEL_DIR, exist_ok=True)
 ) = range(28)
 
 # ================ LOGGER ================
-logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO)
+logging.basicConfig(
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", 
+    level=logging.INFO
+)
 logger = logging.getLogger(__name__)
 
 # ================ DATA ================
@@ -96,24 +147,29 @@ def load_user_data():
             sales_count_per_category.update(data.get("sales_count_per_category", {}))
             MANUAL_DELIVERY_CATEGORIES = data.get("manual_delivery_categories", [])
     except FileNotFoundError:
-        pass
+        logger.info("No user_data.json found. Starting fresh.")
+    except Exception as e:
+        logger.error(f"Error loading user data: {e}")
 
 def save_user_data():
-    with open("user_data.json", "w", encoding='utf-8') as f:
-        data = {
-            "balances": balances,
-            "user_sales": user_sales,
-            "user_deposits": user_deposits,
-            "user_info": user_info,
-            "total_deposits": total_deposits,
-            "total_sales": total_sales,
-            "transaction_log": transaction_log,
-            "categories": categories,
-            "prices": prices,
-            "sales_count_per_category": sales_count_per_category,
-            "manual_delivery_categories": MANUAL_DELIVERY_CATEGORIES
-        }
-        json.dump(data, f, ensure_ascii=False, indent=4)
+    try:
+        with open("user_data.json", "w", encoding='utf-8') as f:
+            data = {
+                "balances": balances,
+                "user_sales": user_sales,
+                "user_deposits": user_deposits,
+                "user_info": user_info,
+                "total_deposits": total_deposits,
+                "total_sales": total_sales,
+                "transaction_log": transaction_log,
+                "categories": categories,
+                "prices": prices,
+                "sales_count_per_category": sales_count_per_category,
+                "manual_delivery_categories": MANUAL_DELIVERY_CATEGORIES
+            }
+            json.dump(data, f, ensure_ascii=False, indent=4)
+    except Exception as e:
+        logger.error(f"Error saving user data: {e}")
         
 load_user_data()
 
@@ -1755,146 +1811,153 @@ def admin_deposit_action(update: Update, context: CallbackContext):
 
 # ================ MAIN ================
 def main():
-    updater = Updater(token=BOT_TOKEN, use_context=True)
-    dp = updater.dispatcher
+    logger.info("🤖 Starting Telegram Bot...")
+    
+    try:
+        updater = Updater(token=BOT_TOKEN, use_context=True)
+        dp = updater.dispatcher
 
-    conv = ConversationHandler(
-        entry_points=[
-            CommandHandler("start", start),
-            MessageHandler(Filters.text & ~Filters.command, menu_handler)
-        ],
-        states={
-            MAIN_MENU: [
-                MessageHandler(Filters.text & Filters.regex("🔙 Back to Main Menu"), start),
+        conv = ConversationHandler(
+            entry_points=[
+                CommandHandler("start", start),
                 MessageHandler(Filters.text & ~Filters.command, menu_handler)
             ],
-            BUY_MENU: [
-                MessageHandler(Filters.text & Filters.regex("🔙 Back to Main Menu"), start),
-                MessageHandler(Filters.text & ~Filters.command, user_choose_category)
-            ],
-            BUY_SUB_MENU: [
-                MessageHandler(Filters.text & Filters.regex("🔙 Back to Categories"), back_to_categories_handler),
-                MessageHandler(Filters.text & Filters.regex("🔙 Back to Main Menu"), start),
-                MessageHandler(Filters.text & ~Filters.command, user_choose_subcategory)
-            ],
-            GET_QUANTITY: [
-                MessageHandler(Filters.text & Filters.regex("🔙 Back to Sub Categories"), back_to_subcategories_handler),
-                MessageHandler(Filters.text & Filters.regex("🔙 Back to Main Menu"), start),
-                MessageHandler(Filters.text & ~Filters.command, receive_quantity)
-            ],
-            CONFIRM_ORDER: [
-                MessageHandler(Filters.text & Filters.regex("🔙 Back to Sub Categories"), back_to_subcategories_handler),
-                MessageHandler(Filters.text & Filters.regex("🔙 Back to Main Menu"), start),
-                MessageHandler(Filters.text & Filters.regex("✅ Confirm Purchase"), confirm_order),
-                MessageHandler(Filters.text & ~Filters.command, confirm_order)
-            ],
-            WAIT_SCREENSHOT: [
-                MessageHandler(Filters.text & Filters.regex("🔙 Back to Sub Categories"), back_to_subcategories_handler),
-                MessageHandler(Filters.text & Filters.regex("🔙 Back to Main Menu"), start),
-                MessageHandler(Filters.photo | Filters.text, user_send_screenshot),
-            ],
-            ADMIN_PANEL: [
-                MessageHandler(Filters.text & Filters.regex("🔙 Back to Main Menu"), start),
-                MessageHandler(Filters.text & ~Filters.command, admin_panel_handler)
-            ],
-            MANAGE_CATEGORY: [
-                MessageHandler(Filters.text & Filters.regex("🔙 Admin Panel"), back_to_admin_panel_handler),
-                MessageHandler(Filters.text & ~Filters.command, manage_category_handler)
-            ],
-            MANAGE_SUB_CATEGORY: [
-                MessageHandler(Filters.text & Filters.regex("🔙 Admin Panel"), back_to_admin_panel_handler),
-                MessageHandler(Filters.text & Filters.regex("🔙 Manage Categories"), back_to_manage_main_categories_handler),
-                MessageHandler(Filters.text & ~Filters.command, manage_sub_category_handler)
-            ],
-            ADD_MAIN_CAT: [
-                MessageHandler(Filters.text & Filters.regex("🔙 Admin Panel"), back_to_admin_panel_handler),
-                MessageHandler(Filters.text & ~Filters.command, add_main_category)
-            ],
-            REMOVE_MAIN_CAT: [
-                MessageHandler(Filters.text & Filters.regex("🔙 Admin Panel"), back_to_admin_panel_handler),
-                MessageHandler(Filters.text & ~Filters.command, remove_main_category)
-            ],
-            ADD_SUB_CAT: [
-                MessageHandler(Filters.text & Filters.regex("🔙 Admin Panel"), back_to_admin_panel_handler),
-                MessageHandler(Filters.text & Filters.regex("🔙 Manage Categories"), back_to_manage_main_categories_handler),
-                MessageHandler(Filters.text & ~Filters.command, add_sub_category)
-            ],
-            REMOVE_SUB_CAT: [
-                MessageHandler(Filters.text & Filters.regex("🔙 Admin Panel"), back_to_admin_panel_handler),
-                MessageHandler(Filters.text & Filters.regex("🔙 Manage Categories"), back_to_manage_main_categories_handler),
-                MessageHandler(Filters.text & ~Filters.command, remove_sub_category)
-            ],
-            ADD_ITEMS_TXT: [
-                MessageHandler(Filters.text & Filters.regex("🔙 Admin Panel"), back_to_admin_panel_handler),
-                MessageHandler(Filters.text & Filters.regex("🔙 Manage Categories"), back_to_manage_main_categories_handler),
-                MessageHandler(Filters.text & Filters.regex("✅ Done"), add_items_txt_handler),
-                MessageHandler(Filters.document | Filters.text, add_items_txt_handler),
-            ],
-            EDIT_PAYMENT: [
-                MessageHandler(Filters.text & Filters.regex("🔙 Admin Panel"), back_to_admin_panel_handler),
-                MessageHandler(Filters.text & ~Filters.command, edit_payment_info)
-            ],
-            EDIT_PRICE_MAIN: [
-                MessageHandler(Filters.text & Filters.regex("🔙 Admin Panel"), back_to_admin_panel_handler),
-                MessageHandler(Filters.text & ~Filters.command, edit_price_main_handler)
-            ],
-            EDIT_PRICE_SUB: [
-                MessageHandler(Filters.text & Filters.regex("🔙 Admin Panel"), back_to_admin_panel_handler),
-                MessageHandler(Filters.text & ~Filters.command, edit_price_sub_handler)
-            ],
-            RECEIVE_NEW_PRICE: [
-                MessageHandler(Filters.text & Filters.regex("🔙 Admin Panel"), back_to_admin_panel_handler),
-                MessageHandler(Filters.text & ~Filters.command, receive_price)
-            ],
-            DEPOSIT: [
-                MessageHandler(Filters.text & Filters.regex("🔙 Back to Main Menu"), start),
-                MessageHandler(Filters.text & ~Filters.command, deposit_handler),
-            ],
-            GET_DEPOSIT_AMOUNT: [
-                MessageHandler(Filters.text & Filters.regex("🔙 Back to Main Menu"), start),
-                MessageHandler(Filters.photo, receive_deposit_screenshot)
-            ],
-            DASHBOARD: [
-                MessageHandler(Filters.text & Filters.regex("🔄 Refresh Dashboard"), handle_dashboard_refresh),
-                MessageHandler(Filters.text & Filters.regex("🔙 Admin Panel"), back_to_admin_panel_handler)
-            ],
-            SEND_NOTICE: [
-                MessageHandler(Filters.text & Filters.regex("🔙 Admin Panel"), back_to_admin_panel_handler),
-                MessageHandler(Filters.text & ~Filters.command, send_notice_text)
-            ],
-            SEARCH_USER_PROFILE: [
-                MessageHandler(Filters.text & Filters.regex("🔙 Admin Panel"), back_to_admin_panel_handler),
-                MessageHandler(Filters.text & ~Filters.command, search_and_show_user_profile)
-            ],
-            MANAGE_PAYMENT_CATEGORIES: [
-                CallbackQueryHandler(toggle_payment_method),
-                MessageHandler(Filters.text & Filters.regex("🔙 Admin Panel"), back_to_admin_panel_handler)
-            ],
-            SEARCH_USER_FOR_BALANCE: [
-                MessageHandler(Filters.text & Filters.regex("🔙 Admin Panel"), back_to_admin_panel_handler),
-                MessageHandler(Filters.text & ~Filters.command, search_user_for_balance)
-            ],
-            BALANCE_EDIT_ACTION: [
-                MessageHandler(Filters.text & Filters.regex("🔙 Admin Panel"), back_to_admin_panel_handler),
-                MessageHandler(Filters.text & ~Filters.command, balance_edit_action_handler)
-            ],
-            RECEIVE_BALANCE_EDIT_AMOUNT: [
-                MessageHandler(Filters.text & Filters.regex("🔙 Admin Panel"), back_to_admin_panel_handler),
-                MessageHandler(Filters.text & ~Filters.command, receive_balance_edit_amount)
-            ]
-        },
-        fallbacks=[CommandHandler("start", start)]
-    )
+            states={
+                MAIN_MENU: [
+                    MessageHandler(Filters.text & Filters.regex("🔙 Back to Main Menu"), start),
+                    MessageHandler(Filters.text & ~Filters.command, menu_handler)
+                ],
+                BUY_MENU: [
+                    MessageHandler(Filters.text & Filters.regex("🔙 Back to Main Menu"), start),
+                    MessageHandler(Filters.text & ~Filters.command, user_choose_category)
+                ],
+                BUY_SUB_MENU: [
+                    MessageHandler(Filters.text & Filters.regex("🔙 Back to Categories"), back_to_categories_handler),
+                    MessageHandler(Filters.text & Filters.regex("🔙 Back to Main Menu"), start),
+                    MessageHandler(Filters.text & ~Filters.command, user_choose_subcategory)
+                ],
+                GET_QUANTITY: [
+                    MessageHandler(Filters.text & Filters.regex("🔙 Back to Sub Categories"), back_to_subcategories_handler),
+                    MessageHandler(Filters.text & Filters.regex("🔙 Back to Main Menu"), start),
+                    MessageHandler(Filters.text & ~Filters.command, receive_quantity)
+                ],
+                CONFIRM_ORDER: [
+                    MessageHandler(Filters.text & Filters.regex("🔙 Back to Sub Categories"), back_to_subcategories_handler),
+                    MessageHandler(Filters.text & Filters.regex("🔙 Back to Main Menu"), start),
+                    MessageHandler(Filters.text & Filters.regex("✅ Confirm Purchase"), confirm_order),
+                    MessageHandler(Filters.text & ~Filters.command, confirm_order)
+                ],
+                WAIT_SCREENSHOT: [
+                    MessageHandler(Filters.text & Filters.regex("🔙 Back to Sub Categories"), back_to_subcategories_handler),
+                    MessageHandler(Filters.text & Filters.regex("🔙 Back to Main Menu"), start),
+                    MessageHandler(Filters.photo | Filters.text, user_send_screenshot),
+                ],
+                ADMIN_PANEL: [
+                    MessageHandler(Filters.text & Filters.regex("🔙 Back to Main Menu"), start),
+                    MessageHandler(Filters.text & ~Filters.command, admin_panel_handler)
+                ],
+                MANAGE_CATEGORY: [
+                    MessageHandler(Filters.text & Filters.regex("🔙 Admin Panel"), back_to_admin_panel_handler),
+                    MessageHandler(Filters.text & ~Filters.command, manage_category_handler)
+                ],
+                MANAGE_SUB_CATEGORY: [
+                    MessageHandler(Filters.text & Filters.regex("🔙 Admin Panel"), back_to_admin_panel_handler),
+                    MessageHandler(Filters.text & Filters.regex("🔙 Manage Categories"), back_to_manage_main_categories_handler),
+                    MessageHandler(Filters.text & ~Filters.command, manage_sub_category_handler)
+                ],
+                ADD_MAIN_CAT: [
+                    MessageHandler(Filters.text & Filters.regex("🔙 Admin Panel"), back_to_admin_panel_handler),
+                    MessageHandler(Filters.text & ~Filters.command, add_main_category)
+                ],
+                REMOVE_MAIN_CAT: [
+                    MessageHandler(Filters.text & Filters.regex("🔙 Admin Panel"), back_to_admin_panel_handler),
+                    MessageHandler(Filters.text & ~Filters.command, remove_main_category)
+                ],
+                ADD_SUB_CAT: [
+                    MessageHandler(Filters.text & Filters.regex("🔙 Admin Panel"), back_to_admin_panel_handler),
+                    MessageHandler(Filters.text & Filters.regex("🔙 Manage Categories"), back_to_manage_main_categories_handler),
+                    MessageHandler(Filters.text & ~Filters.command, add_sub_category)
+                ],
+                REMOVE_SUB_CAT: [
+                    MessageHandler(Filters.text & Filters.regex("🔙 Admin Panel"), back_to_admin_panel_handler),
+                    MessageHandler(Filters.text & Filters.regex("🔙 Manage Categories"), back_to_manage_main_categories_handler),
+                    MessageHandler(Filters.text & ~Filters.command, remove_sub_category)
+                ],
+                ADD_ITEMS_TXT: [
+                    MessageHandler(Filters.text & Filters.regex("🔙 Admin Panel"), back_to_admin_panel_handler),
+                    MessageHandler(Filters.text & Filters.regex("🔙 Manage Categories"), back_to_manage_main_categories_handler),
+                    MessageHandler(Filters.text & Filters.regex("✅ Done"), add_items_txt_handler),
+                    MessageHandler(Filters.document | Filters.text, add_items_txt_handler),
+                ],
+                EDIT_PAYMENT: [
+                    MessageHandler(Filters.text & Filters.regex("🔙 Admin Panel"), back_to_admin_panel_handler),
+                    MessageHandler(Filters.text & ~Filters.command, edit_payment_info)
+                ],
+                EDIT_PRICE_MAIN: [
+                    MessageHandler(Filters.text & Filters.regex("🔙 Admin Panel"), back_to_admin_panel_handler),
+                    MessageHandler(Filters.text & ~Filters.command, edit_price_main_handler)
+                ],
+                EDIT_PRICE_SUB: [
+                    MessageHandler(Filters.text & Filters.regex("🔙 Admin Panel"), back_to_admin_panel_handler),
+                    MessageHandler(Filters.text & ~Filters.command, edit_price_sub_handler)
+                ],
+                RECEIVE_NEW_PRICE: [
+                    MessageHandler(Filters.text & Filters.regex("🔙 Admin Panel"), back_to_admin_panel_handler),
+                    MessageHandler(Filters.text & ~Filters.command, receive_price)
+                ],
+                DEPOSIT: [
+                    MessageHandler(Filters.text & Filters.regex("🔙 Back to Main Menu"), start),
+                    MessageHandler(Filters.text & ~Filters.command, deposit_handler),
+                ],
+                GET_DEPOSIT_AMOUNT: [
+                    MessageHandler(Filters.text & Filters.regex("🔙 Back to Main Menu"), start),
+                    MessageHandler(Filters.photo, receive_deposit_screenshot)
+                ],
+                DASHBOARD: [
+                    MessageHandler(Filters.text & Filters.regex("🔄 Refresh Dashboard"), handle_dashboard_refresh),
+                    MessageHandler(Filters.text & Filters.regex("🔙 Admin Panel"), back_to_admin_panel_handler)
+                ],
+                SEND_NOTICE: [
+                    MessageHandler(Filters.text & Filters.regex("🔙 Admin Panel"), back_to_admin_panel_handler),
+                    MessageHandler(Filters.text & ~Filters.command, send_notice_text)
+                ],
+                SEARCH_USER_PROFILE: [
+                    MessageHandler(Filters.text & Filters.regex("🔙 Admin Panel"), back_to_admin_panel_handler),
+                    MessageHandler(Filters.text & ~Filters.command, search_and_show_user_profile)
+                ],
+                MANAGE_PAYMENT_CATEGORIES: [
+                    CallbackQueryHandler(toggle_payment_method),
+                    MessageHandler(Filters.text & Filters.regex("🔙 Admin Panel"), back_to_admin_panel_handler)
+                ],
+                SEARCH_USER_FOR_BALANCE: [
+                    MessageHandler(Filters.text & Filters.regex("🔙 Admin Panel"), back_to_admin_panel_handler),
+                    MessageHandler(Filters.text & ~Filters.command, search_user_for_balance)
+                ],
+                BALANCE_EDIT_ACTION: [
+                    MessageHandler(Filters.text & Filters.regex("🔙 Admin Panel"), back_to_admin_panel_handler),
+                    MessageHandler(Filters.text & ~Filters.command, balance_edit_action_handler)
+                ],
+                RECEIVE_BALANCE_EDIT_AMOUNT: [
+                    MessageHandler(Filters.text & Filters.regex("🔙 Admin Panel"), back_to_admin_panel_handler),
+                    MessageHandler(Filters.text & ~Filters.command, receive_balance_edit_amount)
+                ]
+            },
+            fallbacks=[CommandHandler("start", start)]
+        )
 
-    dp.add_handler(conv)
-    dp.add_handler(CallbackQueryHandler(admin_order_action, pattern="^(confirm:|cancel:|confirm_manual:|cancel_manual:|force_confirm:)"))
-    dp.add_handler(CallbackQueryHandler(admin_deposit_action, pattern="^(deposit_confirm:|deposit_cancel:)"))
-    dp.add_handler(CallbackQueryHandler(toggle_payment_method, pattern="^toggle_payment:"))
-    dp.add_handler(MessageHandler(Filters.text & ~Filters.command & Filters.regex("🔙 Back to Main Menu"), start))
-    
-    logger.info("🤖 বট চলছে...")
-    updater.start_polling()
-    updater.idle()
+        dp.add_handler(conv)
+        dp.add_handler(CallbackQueryHandler(admin_order_action, pattern="^(confirm:|cancel:|confirm_manual:|cancel_manual:|force_confirm:)"))
+        dp.add_handler(CallbackQueryHandler(admin_deposit_action, pattern="^(deposit_confirm:|deposit_cancel:)"))
+        dp.add_handler(CallbackQueryHandler(toggle_payment_method, pattern="^toggle_payment:"))
+        dp.add_handler(MessageHandler(Filters.text & ~Filters.command & Filters.regex("🔙 Back to Main Menu"), start))
+        
+        logger.info("🤖 Bot is running and polling...")
+        updater.start_polling()
+        updater.idle()
+        
+    except Exception as e:
+        logger.error(f"Error starting bot: {e}")
+        raise
 
 if __name__ == "__main__":
     main()
