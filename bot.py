@@ -1,14 +1,3 @@
-# ========== PYTHON 3.14+ PATCH ==========
-import sys
-import types
-
-if sys.version_info >= (3, 13):
-    if 'imghdr' not in sys.modules:
-        imghdr = types.ModuleType('imghdr')
-        imghdr.what = lambda f, h=None: None
-        sys.modules['imghdr'] = imghdr
-# ========== END PATCH ==========
-
 import logging
 import os
 import io
