@@ -17,15 +17,16 @@ import json
 import threading
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
+# ✅ সঠিক ইম্পোর্ট - v13.x এর জন্য
 from telegram import (
     Update, ReplyKeyboardMarkup, KeyboardButton, InputFile,
-    ReplyKeyboardRemove, InlineKeyboardMarkup, InlineKeyboardButton
+    ReplyKeyboardRemove, InlineKeyboardMarkup, InlineKeyboardButton,
+    ChatMember
 )
 from telegram.ext import (
     Updater, CommandHandler, MessageHandler,
     Filters, CallbackContext, ConversationHandler, CallbackQueryHandler
 )
-from telegram import ChatMember
 from openpyxl import Workbook, load_workbook
 
 # ================ HTTP SERVER FOR RENDER ================
@@ -46,7 +47,6 @@ class HealthCheckHandler(BaseHTTPRequestHandler):
             self.end_headers()
     
     def log_message(self, format, *args):
-        # Suppress HTTP logs
         pass
 
 def run_http_server():
