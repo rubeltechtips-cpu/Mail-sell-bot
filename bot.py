@@ -50,13 +50,12 @@ def run_http_server():
     try:
         port = int(os.environ.get('PORT', 8000))
         server = HTTPServer(('0.0.0.0', port), HealthCheckHandler)
-        logging.info(f"🌐 HTTP Server running on port {port}")
+        logging.info(f"HTTP Server running on port {port}")
         server.serve_forever()
     except Exception as e:
         logging.error(f"HTTP Server error: {e}")
 
 threading.Thread(target=run_http_server, daemon=True).start()
-# ================ END HTTP SERVER ================
 
 # ================ CONFIG ================
 BOT_TOKEN = "8349208659:AAEyJikjx1tUri_PztFGRca_lPT0WilJ0N0"
@@ -552,7 +551,7 @@ def receive_balance_edit_amount(update, context):
         context.user_data.pop('balance_edit_action', None)
         return back_to_admin_panel_handler(update, context)
     if not amount_str.isdigit() or float(amount_str) < 0:
-        update.message.reply_text("❌ অনুগ্রহ করে একটি ধনাত্মক সংখ্যা লিখুন。", reply_markup=ReplyKeyboardMarkup([[KeyboardButton("🔙 Admin Panel")]], resize_keyboard=True))
+        update.message.reply_text("❌ অনুগ্রহ করে একটি ধনাত্মক সংখ্যা লিখুন।", reply_markup=ReplyKeyboardMarkup([[KeyboardButton("🔙 Admin Panel")]], resize_keyboard=True))
         return RECEIVE_BALANCE_EDIT_AMOUNT
     amount = float(amount_str)
     user_id = context.user_data.get('edit_balance_user_id')
@@ -699,7 +698,7 @@ def manage_payment_categories_handler(update, context):
         reply_markup=reply_markup_inline
     )
     reply_markup_text = ReplyKeyboardMarkup([[KeyboardButton("🔙 Admin Panel")]], resize_keyboard=True)
-    update.message.reply_text("🔙 অ্যাডমিন প্যানেলে ফিরে যেতে নিচের বাটনটি চাপুন。", reply_markup=reply_markup_text)
+    update.message.reply_text("🔙 অ্যাডমিন প্যানেলে ফিরে যেতে নিচের বাটনটি চাপুন।", reply_markup=reply_markup_text)
     return MANAGE_PAYMENT_CATEGORIES
 
 def toggle_payment_method(update, context):
@@ -1014,7 +1013,7 @@ def add_items_txt_handler(update, context):
                 update.message.reply_text(
                     f"✅ '{sub_cat}' তে আইটেম যোগ হয়েছে।\n"
                     f"বর্তমান মোট আইটেম: {count} টি\n\n"
-                    f"আরও ফাইল আপলোড করতে পারেন অথবা '✅ Done' চাপুন。",
+                    f"আরও ফাইল আপলোড করতে পারেন অথবা '✅ Done' চাপুন।",
                     reply_markup=ReplyKeyboardMarkup(
                         [[KeyboardButton("✅ Done"), KeyboardButton("🔙 Manage Categories"), KeyboardButton("🔙 Admin Panel")]],
                         resize_keyboard=True
@@ -1361,14 +1360,14 @@ def admin_order_action(update, context):
             caption=f"✅ আপনার অর্ডার নিশ্চিত করা হয়েছে!\n"
                     f"📦 {sub_cat} - {qty} টি আইটেম\n"
                     f"💰 মোট: {total_price} টাকা\n"
-                    f"📄 এক্সেল ফাইলে আপনার অর্ডার সংযুক্ত আছে。"
+                    f"📄 এক্সেল ফাইলে আপনার অর্ডার সংযুক্ত আছে।"
         )
         total_sales += total_price
         sales_count_per_category[sub_cat] = sales_count_per_category.get(sub_cat, 0) + qty
         transaction_log.append(('sale', uid, total_price, time.time()))
         user_sales[uid] = user_sales.get(uid, 0) + total_price
         save_user_data()
-        query.edit_message_caption(query.message.caption + f"\n\n✅ অ্যাডমিন দ্বারা নিশ্চিত। এক্সেল ফাইল ইউজারকে পাঠানো হয়েছে。", reply_markup=None)
+        query.edit_message_caption(query.message.caption + f"\n\n✅ অ্যাডমিন দ্বারা নিশ্চিত। এক্সেল ফাইল ইউজারকে পাঠানো হয়েছে।", reply_markup=None)
     elif data.startswith("force_confirm:"):
         parts = data.split(":")
         uid = int(parts[1])
@@ -1395,10 +1394,10 @@ def admin_order_action(update, context):
         transaction_log.append(('sale', uid, total_price, time.time()))
         user_sales[uid] = user_sales.get(uid, 0) + total_price
         save_user_data()
-        query.edit_message_caption(query.message.caption + f"\n\n✅ ফোর্স নিশ্চিত করা হয়েছে। ইউজারকে ম্যানুয়ালি যোগাযোগ করা হবে。", reply_markup=None)
+        query.edit_message_caption(query.message.caption + f"\n\n✅ ফোর্স নিশ্চিত করা হয়েছে। ইউজারকে ম্যানুয়ালি যোগাযোগ করা হবে।", reply_markup=None)
     elif data.startswith("cancel_manual:"):
         _, uid = data.split(":")
-        context.bot.send_message(chat_id=uid, text="❌ দুঃখিত, আপনার অর্ডারটি বাতিল করা হয়েছে。")
+        context.bot.send_message(chat_id=uid, text="❌ দুঃখিত, আপনার অর্ডারটি বাতিল করা হয়েছে।")
         query.edit_message_caption(query.message.caption + "\n\n❌ অ্যাডমিন দ্বারা বাতিল", reply_markup=None)
 
 # ================ ADMIN DEPOSIT ACTIONS ================
