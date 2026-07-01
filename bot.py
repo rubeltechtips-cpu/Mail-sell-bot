@@ -26,7 +26,7 @@ from telegram.ext import (
 )
 from openpyxl import Workbook
 
-# HTTP Server
+# ================ HTTP SERVER ================
 class HealthCheckHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path == '/':
@@ -56,8 +56,9 @@ def run_http_server():
         logging.error(f"HTTP Server error: {e}")
 
 threading.Thread(target=run_http_server, daemon=True).start()
+# ================ END HTTP SERVER ================
 
-# Config
+# ================ CONFIG ================
 BOT_TOKEN = "8349208659:AAEyJikjx1tUri_PztFGRca_lPT0WilJ0N0"
 ADMIN_ID = 8061006207
 ADMIN_USERNAME = "Rubel_QSB"
@@ -70,7 +71,7 @@ os.makedirs(DATA_DIR, exist_ok=True)
 os.makedirs(TXT_DIR, exist_ok=True)
 os.makedirs(EXCEL_DIR, exist_ok=True)
 
-# States
+# ================ STATES ================
 (
     MAIN_MENU, BUY_MENU, BUY_SUB_MENU, ADMIN_PANEL,
     ADD_MAIN_CAT, REMOVE_MAIN_CAT, MANAGE_CATEGORY, MANAGE_SUB_CATEGORY,
@@ -85,7 +86,7 @@ os.makedirs(EXCEL_DIR, exist_ok=True)
 logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Data
+# ================ DATA ================
 categories = {}
 prices = {}
 payment_info = "বিকাশ: 017XXXXXXXX\nনগদ: 018XXXXXXXX\nবিন্যান্স: yourmail@gmail.com"
@@ -138,28 +139,28 @@ def save_user_data():
 
 load_user_data()
 
-# Helpers
-def get_txt_path(main_cat: str, sub_cat: str) -> str:
+# ================ HELPERS ================
+def get_txt_path(main_cat, sub_cat):
     file_name = f"{main_cat}_{sub_cat}.txt".replace(" ", "_").replace("-", "_")
     return os.path.join(TXT_DIR, file_name)
 
-def get_excel_path(main_cat: str, sub_cat: str) -> str:
+def get_excel_path(main_cat, sub_cat):
     file_name = f"{main_cat}_{sub_cat}.xlsx".replace(" ", "_").replace("-", "_")
     return os.path.join(EXCEL_DIR, file_name)
 
-def ensure_txt_file(main_cat: str, sub_cat: str):
+def ensure_txt_file(main_cat, sub_cat):
     path = get_txt_path(main_cat, sub_cat)
     if not os.path.exists(path):
         with open(path, 'w', encoding='utf-8') as f:
             f.write("")
 
-def add_items_from_txt(main_cat: str, sub_cat: str, txt_content: str):
+def add_items_from_txt(main_cat, sub_cat, txt_content):
     ensure_txt_file(main_cat, sub_cat)
     path = get_txt_path(main_cat, sub_cat)
     with open(path, 'a', encoding='utf-8') as f:
         f.write(txt_content + '\n')
 
-def pop_items_from_txt(main_cat: str, sub_cat: str, qty: int) -> list:
+def pop_items_from_txt(main_cat, sub_cat, qty):
     path = get_txt_path(main_cat, sub_cat)
     if not os.path.exists(path):
         return []
@@ -174,7 +175,7 @@ def pop_items_from_txt(main_cat: str, sub_cat: str, qty: int) -> list:
             f.write(item + '\n')
     return result
 
-def count_items(main_cat: str, sub_cat: str) -> int:
+def count_items(main_cat, sub_cat):
     path = get_txt_path(main_cat, sub_cat)
     if not os.path.exists(path):
         return 0
@@ -182,7 +183,7 @@ def count_items(main_cat: str, sub_cat: str) -> int:
         items = [line.strip() for line in f.readlines() if line.strip()]
     return len(items)
 
-def create_xlsx_file(items: list, file_name: str) -> io.BytesIO:
+def create_xlsx_file(items, file_name):
     wb = Workbook()
     ws = wb.active
     ws.title = "Items"
@@ -193,7 +194,7 @@ def create_xlsx_file(items: list, file_name: str) -> io.BytesIO:
     buffer.seek(0)
     return buffer
 
-def get_total_stock(main_cat: str) -> int:
+def get_total_stock(main_cat):
     total = 0
     if main_cat in categories:
         for sub_cat in categories[main_cat]:
@@ -216,8 +217,8 @@ def get_report_summary(transactions, days):
 def get_user_transactions(user_id, transactions):
     return [t for t in transactions if t[1] == user_id]
 
-# Check Subscription
-def check_subscription(update: Update, context: CallbackContext):
+# ================ CHECK SUBSCRIPTION ================
+def check_subscription(update, context):
     user_id = update.effective_user.id
     try:
         chat_member = context.bot.get_chat_member(chat_id=f"@{CHANNEL_USERNAME}", user_id=user_id)
@@ -238,8 +239,8 @@ def check_subscription(update: Update, context: CallbackContext):
         update.message.reply_text("চ্যানেল সদস্যতা পরীক্ষা করতে সমস্যা হচ্ছে।")
         return False
 
-# Start
-def start(update: Update, context: CallbackContext):
+# ================ START ================
+def start(update, context):
     if not check_subscription(update, context):
         return ConversationHandler.END
     
@@ -269,7 +270,7 @@ def start(update: Update, context: CallbackContext):
     update.message.reply_text(f"👋 স্বাগতম! আপনার বর্তমান ব্যালেন্স: {current_balance} টাকা।", reply_markup=reply_markup)
     return MAIN_MENU
 
-def menu_handler(update: Update, context: CallbackContext):
+def menu_handler(update, context):
     if not check_subscription(update, context):
         return ConversationHandler.END
 
@@ -316,7 +317,7 @@ def menu_handler(update: Update, context: CallbackContext):
     return MAIN_MENU
 
 # ================ DASHBOARD ================
-def show_dashboard(update: Update, context: CallbackContext):
+def show_dashboard(update, context):
     if update.effective_user.id != ADMIN_ID:
         return MAIN_MENU
 
@@ -406,20 +407,21 @@ def show_dashboard(update: Update, context: CallbackContext):
     update.message.reply_text("⚙️ অ্যাডমিন প্যানেল:", reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True))
     return ADMIN_PANEL
 
-def handle_dashboard_refresh(update: Update, context: CallbackContext):
+def handle_dashboard_refresh(update, context):
     if update.effective_user.id != ADMIN_ID:
         return MAIN_MENU
     if update.message.text == "🔄 Refresh Dashboard":
         return show_dashboard(update, context)
     return back_to_admin_panel_handler(update, context)
 
-def view_user_profile(update: Update, context: CallbackContext):
+# ================ USER PROFILE ================
+def view_user_profile(update, context):
     if update.effective_user.id != ADMIN_ID:
         return MAIN_MENU
     update.message.reply_text("✍️ যে ব্যবহারকারীর প্রোফাইল দেখতে চান তার ইউজারনাম বা ইউজার আইডি লিখুন:", reply_markup=ReplyKeyboardMarkup([[KeyboardButton("🔙 Admin Panel")]], resize_keyboard=True))
     return SEARCH_USER_PROFILE
 
-def search_and_show_user_profile(update: Update, context: CallbackContext):
+def search_and_show_user_profile(update, context):
     if update.effective_user.id != ADMIN_ID:
         return MAIN_MENU
     search_term = update.message.text.strip().lstrip('@')
@@ -476,8 +478,8 @@ def search_and_show_user_profile(update: Update, context: CallbackContext):
     update.message.reply_text(profile_text, reply_markup=ReplyKeyboardMarkup([[KeyboardButton("🔙 Admin Panel")]], resize_keyboard=True))
     return SEARCH_USER_PROFILE
 
-# Balance Edit
-def edit_user_balance_start(update: Update, context: CallbackContext):
+# ================ BALANCE EDIT ================
+def edit_user_balance_start(update, context):
     if update.effective_user.id != ADMIN_ID:
         return MAIN_MENU
     update.message.reply_text(
@@ -486,7 +488,7 @@ def edit_user_balance_start(update: Update, context: CallbackContext):
     )
     return SEARCH_USER_FOR_BALANCE
 
-def search_user_for_balance(update: Update, context: CallbackContext):
+def search_user_for_balance(update, context):
     if update.effective_user.id != ADMIN_ID:
         return MAIN_MENU
     search_term = update.message.text.strip().lstrip('@')
@@ -522,7 +524,7 @@ def search_user_for_balance(update: Update, context: CallbackContext):
     )
     return BALANCE_EDIT_ACTION
 
-def balance_edit_action_handler(update: Update, context: CallbackContext):
+def balance_edit_action_handler(update, context):
     if update.effective_user.id != ADMIN_ID:
         return MAIN_MENU
     action_text = update.message.text
@@ -541,7 +543,7 @@ def balance_edit_action_handler(update: Update, context: CallbackContext):
     update.message.reply_text(prompt, reply_markup=ReplyKeyboardMarkup([[KeyboardButton("🔙 Admin Panel")]], resize_keyboard=True))
     return RECEIVE_BALANCE_EDIT_AMOUNT
 
-def receive_balance_edit_amount(update: Update, context: CallbackContext):
+def receive_balance_edit_amount(update, context):
     if update.effective_user.id != ADMIN_ID:
         return MAIN_MENU
     amount_str = update.message.text.strip()
@@ -550,7 +552,7 @@ def receive_balance_edit_amount(update: Update, context: CallbackContext):
         context.user_data.pop('balance_edit_action', None)
         return back_to_admin_panel_handler(update, context)
     if not amount_str.isdigit() or float(amount_str) < 0:
-        update.message.reply_text("❌ অনুগ্রহ করে একটি ধনাত্মক সংখ্যা লিখুন।", reply_markup=ReplyKeyboardMarkup([[KeyboardButton("🔙 Admin Panel")]], resize_keyboard=True))
+        update.message.reply_text("❌ অনুগ্রহ করে একটি ধনাত্মক সংখ্যা লিখুন。", reply_markup=ReplyKeyboardMarkup([[KeyboardButton("🔙 Admin Panel")]], resize_keyboard=True))
         return RECEIVE_BALANCE_EDIT_AMOUNT
     amount = float(amount_str)
     user_id = context.user_data.get('edit_balance_user_id')
@@ -588,8 +590,8 @@ def receive_balance_edit_amount(update: Update, context: CallbackContext):
     context.user_data.pop('balance_edit_action', None)
     return show_dashboard(update, context)
 
-# Deposit
-def deposit_handler(update: Update, context: CallbackContext):
+# ================ DEPOSIT ================
+def deposit_handler(update, context):
     amount_str = update.message.text.strip()
     if amount_str == "🔙 Back to Main Menu":
         return start(update, context)
@@ -606,7 +608,7 @@ def deposit_handler(update: Update, context: CallbackContext):
     )
     return GET_DEPOSIT_AMOUNT
 
-def receive_deposit_screenshot(update: Update, context: CallbackContext):
+def receive_deposit_screenshot(update, context):
     if update.message.text == "🔙 Back to Main Menu":
         return start(update, context)
     if not update.message.photo:
@@ -630,13 +632,13 @@ def receive_deposit_screenshot(update: Update, context: CallbackContext):
     context.user_data.clear()
     return ConversationHandler.END
 
-# Admin Panel
-def back_to_admin_panel_handler(update: Update, context: CallbackContext):
+# ================ ADMIN PANEL ================
+def back_to_admin_panel_handler(update, context):
     if update.effective_user.id != ADMIN_ID:
         return MAIN_MENU
     return show_dashboard(update, context)
 
-def admin_panel_handler(update: Update, context: CallbackContext):
+def admin_panel_handler(update, context):
     if update.effective_user.id != ADMIN_ID:
         return MAIN_MENU
     text = update.message.text
@@ -673,7 +675,7 @@ def admin_panel_handler(update: Update, context: CallbackContext):
         return manage_payment_categories_handler(update, context)
     return ADMIN_PANEL
 
-def manage_payment_categories_handler(update: Update, context: CallbackContext):
+def manage_payment_categories_handler(update, context):
     if update.effective_user.id != ADMIN_ID:
         return MAIN_MENU
     keyboard_inline = []
@@ -697,10 +699,10 @@ def manage_payment_categories_handler(update: Update, context: CallbackContext):
         reply_markup=reply_markup_inline
     )
     reply_markup_text = ReplyKeyboardMarkup([[KeyboardButton("🔙 Admin Panel")]], resize_keyboard=True)
-    update.message.reply_text("🔙 অ্যাডমিন প্যানেলে ফিরে যেতে নিচের বাটনটি চাপুন।", reply_markup=reply_markup_text)
+    update.message.reply_text("🔙 অ্যাডমিন প্যানেলে ফিরে যেতে নিচের বাটনটি চাপুন。", reply_markup=reply_markup_text)
     return MANAGE_PAYMENT_CATEGORIES
 
-def toggle_payment_method(update: Update, context: CallbackContext):
+def toggle_payment_method(update, context):
     query = update.callback_query
     query.answer()
     data = query.data
@@ -733,7 +735,7 @@ def toggle_payment_method(update: Update, context: CallbackContext):
         )
     return
 
-def send_notice_text(update: Update, context: CallbackContext):
+def send_notice_text(update, context):
     if update.effective_user.id != ADMIN_ID:
         return MAIN_MENU
     notice_text = update.message.text
@@ -752,14 +754,15 @@ def send_notice_text(update: Update, context: CallbackContext):
     update.message.reply_text(f"✅ নোটিশ পাঠানো হয়েছে।\n\nসফল: {notice_count} জন\nব্যর্থ: {len(failed_users)} জন", reply_markup=ReplyKeyboardMarkup([[KeyboardButton("🔙 Admin Panel")]], resize_keyboard=True))
     return back_to_admin_panel_handler(update, context)
 
-def back_to_manage_main_categories_handler(update: Update, context: CallbackContext):
+# ================ MANAGE CATEGORIES ================
+def back_to_manage_main_categories_handler(update, context):
     if "active_main_cat" in context.user_data:
         del context.user_data["active_main_cat"]
     if "active_sub_cat" in context.user_data:
         del context.user_data["active_sub_cat"]
     return manage_category_handler(update, context)
 
-def manage_category_handler(update: Update, context: CallbackContext):
+def manage_category_handler(update, context):
     if update.effective_user.id != ADMIN_ID:
         return MAIN_MENU
     text = update.message.text
@@ -794,7 +797,7 @@ def manage_category_handler(update: Update, context: CallbackContext):
         return MANAGE_SUB_CATEGORY
     return MANAGE_CATEGORY
 
-def add_main_category(update: Update, context: CallbackContext):
+def add_main_category(update, context):
     if update.effective_user.id != ADMIN_ID:
         return MAIN_MENU
     new_cat = update.message.text.strip()
@@ -808,7 +811,7 @@ def add_main_category(update: Update, context: CallbackContext):
         update.message.reply_text(f"✅ প্রধান ক্যাটাগরি '{new_cat}' যোগ হয়েছে।")
     return manage_category_handler(update, context)
 
-def remove_main_category(update: Update, context: CallbackContext):
+def remove_main_category(update, context):
     if update.effective_user.id != ADMIN_ID:
         return MAIN_MENU
     cat_to_remove = update.message.text.split(" (")[0].strip()
@@ -835,7 +838,7 @@ def remove_main_category(update: Update, context: CallbackContext):
         update.message.reply_text("⚠️ এই ক্যাটাগরি পাওয়া যায়নি।")
     return manage_category_handler(update, context)
 
-def manage_sub_category_handler(update: Update, context: CallbackContext):
+def manage_sub_category_handler(update, context):
     if update.effective_user.id != ADMIN_ID:
         return MAIN_MENU
     text = update.message.text
@@ -899,7 +902,7 @@ def manage_sub_category_handler(update: Update, context: CallbackContext):
         return ADD_ITEMS_TXT
     return MANAGE_SUB_CATEGORY
 
-def add_sub_category(update: Update, context: CallbackContext):
+def add_sub_category(update, context):
     if update.effective_user.id != ADMIN_ID:
         return MAIN_MENU
     new_sub_cat = update.message.text.strip()
@@ -928,7 +931,7 @@ def add_sub_category(update: Update, context: CallbackContext):
     update.message.reply_text(f"⚙️ {main_cat} এর সাব-ক্যাটাগরি:", reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True))
     return MANAGE_SUB_CATEGORY
 
-def remove_sub_category(update: Update, context: CallbackContext):
+def remove_sub_category(update, context):
     if update.effective_user.id != ADMIN_ID:
         return MAIN_MENU
     sub_cat_to_remove = update.message.text.split(" (")[0].strip()
@@ -966,7 +969,7 @@ def remove_sub_category(update: Update, context: CallbackContext):
     update.message.reply_text(f"⚙️ {main_cat} এর সাব-ক্যাটাগরি:", reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True))
     return MANAGE_SUB_CATEGORY
 
-def add_items_txt_handler(update: Update, context: CallbackContext):
+def add_items_txt_handler(update, context):
     if update.effective_user.id != ADMIN_ID:
         return MAIN_MENU
     text = update.message.text
@@ -991,7 +994,7 @@ def add_items_txt_handler(update: Update, context: CallbackContext):
             )
             return ADD_ITEMS_TXT
         else:
-            update.message.reply_text("❌ অনুগ্রহ করে একটি বৈধ সাব-ক্যাটাগরি নির্বাচন করুন。")
+            update.message.reply_text("❌ অনুগ্রহ করে একটি বৈধ সাব-ক্যাটাগরি নির্বাচন করুন।")
             return ADD_ITEMS_TXT
     sub_cat = context.user_data.get("active_sub_cat")
     if text == "✅ Done":
@@ -1023,7 +1026,7 @@ def add_items_txt_handler(update: Update, context: CallbackContext):
                 update.message.reply_text("❌ ফাইল প্রসেস করতে সমস্যা হয়েছে।")
                 return ADD_ITEMS_TXT
         else:
-            update.message.reply_text("❌ অনুগ্রহ করে শুধু .txt ফাইল আপলোড করুন。")
+            update.message.reply_text("❌ অনুগ্রহ করে শুধু .txt ফাইল আপলোড করুন।")
             return ADD_ITEMS_TXT
     if text and text not in ["✅ Done", "🔙 Manage Categories", "🔙 Admin Panel"]:
         add_items_from_txt(main_cat, sub_cat, text)
@@ -1040,8 +1043,8 @@ def add_items_txt_handler(update: Update, context: CallbackContext):
         return ADD_ITEMS_TXT
     return ADD_ITEMS_TXT
 
-# Edit Price
-def edit_payment_info(update: Update, context: CallbackContext):
+# ================ EDIT PRICE ================
+def edit_payment_info(update, context):
     if update.effective_user.id != ADMIN_ID:
         return MAIN_MENU
     global payment_info
@@ -1052,7 +1055,7 @@ def edit_payment_info(update: Update, context: CallbackContext):
     update.message.reply_text("✅ পেমেন্ট তথ্য সফলভাবে আপডেট হয়েছে।", reply_markup=ReplyKeyboardMarkup([[KeyboardButton("🔙 Admin Panel")]], resize_keyboard=True))
     return back_to_admin_panel_handler(update, context)
 
-def edit_price_main_handler(update: Update, context: CallbackContext):
+def edit_price_main_handler(update, context):
     if update.effective_user.id != ADMIN_ID:
         return MAIN_MENU
     text = update.message.text.strip()
@@ -1065,10 +1068,10 @@ def edit_price_main_handler(update: Update, context: CallbackContext):
         keyboard.append([KeyboardButton("🔙 Admin Panel")])
         update.message.reply_text(f"✍️ কোন সাব-ক্যাটাগরির মূল্য পরিবর্তন করবেন?", reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True))
         return EDIT_PRICE_SUB
-    update.message.reply_text("❌ এই ক্যাটাগরি পাওয়া যায়নি。", reply_markup=ReplyKeyboardMarkup([[KeyboardButton("🔙 Admin Panel")]], resize_keyboard=True))
+    update.message.reply_text("❌ এই ক্যাটাগরি পাওয়া যায়নি।", reply_markup=ReplyKeyboardMarkup([[KeyboardButton("🔙 Admin Panel")]], resize_keyboard=True))
     return EDIT_PRICE_MAIN
 
-def edit_price_sub_handler(update: Update, context: CallbackContext):
+def edit_price_sub_handler(update, context):
     if update.effective_user.id != ADMIN_ID:
         return MAIN_MENU
     text = update.message.text.strip()
@@ -1082,10 +1085,10 @@ def edit_price_sub_handler(update: Update, context: CallbackContext):
         current_price = prices.get(main_cat, {}).get(text, "সেট করা হয়নি")
         update.message.reply_text(f"✍️ '{text}' এর বর্তমান মূল্য: {current_price}\nনতুন মূল্য লিখুন:", reply_markup=ReplyKeyboardMarkup([[KeyboardButton("🔙 Admin Panel")]], resize_keyboard=True))
         return RECEIVE_NEW_PRICE
-    update.message.reply_text("❌ এই সাব-ক্যাটাগরি পাওয়া যায়নি。", reply_markup=ReplyKeyboardMarkup([[KeyboardButton("🔙 Admin Panel")]], resize_keyboard=True))
+    update.message.reply_text("❌ এই সাব-ক্যাটাগরি পাওয়া যায়নি।", reply_markup=ReplyKeyboardMarkup([[KeyboardButton("🔙 Admin Panel")]], resize_keyboard=True))
     return EDIT_PRICE_SUB
 
-def receive_price(update: Update, context: CallbackContext):
+def receive_price(update, context):
     if update.effective_user.id != ADMIN_ID:
         return MAIN_MENU
     price_text = update.message.text.strip()
@@ -1111,12 +1114,12 @@ def receive_price(update: Update, context: CallbackContext):
                 del context.user_data['temp_sub_cat_for_price']
             return back_to_admin_panel_handler(update, context)
     except ValueError:
-        update.message.reply_text("❌ মূল্য শুধুমাত্র সংখ্যায় লিখুন。", reply_markup=ReplyKeyboardMarkup([[KeyboardButton("🔙 Admin Panel")]], resize_keyboard=True))
+        update.message.reply_text("❌ মূল্য শুধুমাত্র সংখ্যায় লিখুন।", reply_markup=ReplyKeyboardMarkup([[KeyboardButton("🔙 Admin Panel")]], resize_keyboard=True))
         return RECEIVE_NEW_PRICE
     return back_to_admin_panel_handler(update, context)
 
-# Buy Flow
-def back_to_categories_handler(update: Update, context: CallbackContext):
+# ================ BUY FLOW ================
+def back_to_categories_handler(update, context):
     if not check_subscription(update, context):
         return ConversationHandler.END
     keyboard = []
@@ -1126,7 +1129,7 @@ def back_to_categories_handler(update: Update, context: CallbackContext):
     update.message.reply_text("🛒 ক্যাটাগরি বেছে নিন:", reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True))
     return BUY_MENU
 
-def back_to_subcategories_handler(update: Update, context: CallbackContext):
+def back_to_subcategories_handler(update, context):
     if not check_subscription(update, context):
         return ConversationHandler.END
     main_cat = context.user_data.get('temp_main_cat_for_buy')
@@ -1141,7 +1144,7 @@ def back_to_subcategories_handler(update: Update, context: CallbackContext):
     update.message.reply_text(f"🛒 {main_cat} এর সাব-ক্যাটাগরি বেছে নিন:", reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True))
     return BUY_SUB_MENU
 
-def user_choose_category(update: Update, context: CallbackContext):
+def user_choose_category(update, context):
     if not check_subscription(update, context):
         return ConversationHandler.END
     text = update.message.text.strip()
@@ -1159,10 +1162,10 @@ def user_choose_category(update: Update, context: CallbackContext):
         keyboard.append([KeyboardButton("🔙 Back to Main Menu")])
         update.message.reply_text(f"🛒 {original_cat} এর সাব-ক্যাটাগরি বেছে নিন:", reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True))
         return BUY_SUB_MENU
-    update.message.reply_text("❌ এই ক্যাটাগরি পাওয়া যায়নি。")
+    update.message.reply_text("❌ এই ক্যাটাগরি পাওয়া যায়নি।")
     return BUY_MENU
 
-def user_choose_subcategory(update: Update, context: CallbackContext):
+def user_choose_subcategory(update, context):
     if not check_subscription(update, context):
         return ConversationHandler.END
     text = update.message.text.strip()
@@ -1184,7 +1187,7 @@ def user_choose_subcategory(update: Update, context: CallbackContext):
     update.message.reply_text("❌ এই সাব-ক্যাটাগরি পাওয়া যায়নি।")
     return BUY_SUB_MENU
 
-def receive_quantity(update: Update, context: CallbackContext):
+def receive_quantity(update, context):
     if not check_subscription(update, context):
         return ConversationHandler.END
     qty = update.message.text.strip()
@@ -1193,7 +1196,7 @@ def receive_quantity(update: Update, context: CallbackContext):
     if qty == "🔙 Back to Main Menu":
         return start(update, context)
     if not qty.isdigit():
-        update.message.reply_text("❌ অনুগ্রহ করে শুধু সংখ্যা লিখুন。", reply_markup=ReplyKeyboardMarkup([[KeyboardButton("🔙 Back to Sub Categories"), KeyboardButton("🔙 Back to Main Menu")]], resize_keyboard=True))
+        update.message.reply_text("❌ অনুগ্রহ করে শুধু সংখ্যা লিখুন।", reply_markup=ReplyKeyboardMarkup([[KeyboardButton("🔙 Back to Sub Categories"), KeyboardButton("🔙 Back to Main Menu")]], resize_keyboard=True))
         return GET_QUANTITY
     qty = int(qty)
     order = context.user_data.get("order", {})
@@ -1220,7 +1223,7 @@ def receive_quantity(update: Update, context: CallbackContext):
                 f"পরিমাণ: {order['qty']} টি\n"
                 f"মোট দাম: {total_price} টাকা\n"
                 f"আপনার বর্তমান ব্যালেন্স: {current_balance} টাকা\n\n"
-                f"আপনার ব্যালেন্স থেকে পেমেন্ট করতে '✅ Confirm Purchase' চাপুন。",
+                f"আপনার ব্যালেন্স থেকে পেমেন্ট করতে '✅ Confirm Purchase' চাপুন।",
                 reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
             )
             return CONFIRM_ORDER
@@ -1237,12 +1240,12 @@ def receive_quantity(update: Update, context: CallbackContext):
         f"পরিমাণ: {order['qty']} টি\n"
         f"মোট দাম: {total_price} টাকা\n"
         f"⚠️ অনুগ্রহ করে পেমেন্ট করুন:\n{payment_info}\n\n"
-        f"📸 পেমেন্টের পর স্ক্রিনশট পাঠান。",
+        f"📸 পেমেন্টের পর স্ক্রিনশট পাঠান।",
         reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
     )
     return WAIT_SCREENSHOT
 
-def confirm_order(update: Update, context: CallbackContext):
+def confirm_order(update, context):
     if not check_subscription(update, context):
         return ConversationHandler.END
     text = update.message.text
@@ -1265,7 +1268,7 @@ def confirm_order(update: Update, context: CallbackContext):
             items = pop_items_from_txt(main_cat, sub_cat, qty)
             if not items:
                 balances[user_id] = balances.get(user_id, 0) + total_price
-                update.message.reply_text("❌ যথেষ্ট আইটেম স্টকে নেই। আপনার ব্যালেন্স ফেরত দেওয়া হয়েছে。", reply_markup=ReplyKeyboardRemove())
+                update.message.reply_text("❌ যথেষ্ট আইটেম স্টকে নেই। আপনার ব্যালেন্স ফেরত দেওয়া হয়েছে।", reply_markup=ReplyKeyboardRemove())
                 return start(update, context)
             excel_buffer = create_xlsx_file(items, f"{sub_cat}_order.xlsx")
             context.bot.send_document(
@@ -1274,7 +1277,7 @@ def confirm_order(update: Update, context: CallbackContext):
                 caption=f"✅ আপনার অর্ডার সম্পূর্ণ হয়েছে!\n"
                         f"📦 {sub_cat} - {qty} টি আইটেম\n"
                         f"💰 মোট: {total_price} টাকা\n"
-                        f"📄 এক্সেল ফাইলে আপনার অর্ডার সংযুক্ত আছে。"
+                        f"📄 এক্সেল ফাইলে আপনার অর্ডার সংযুক্ত আছে।"
             )
             global total_sales, sales_count_per_category, transaction_log, user_sales
             total_sales += total_price
@@ -1290,7 +1293,7 @@ def confirm_order(update: Update, context: CallbackContext):
             return start(update, context)
     return CONFIRM_ORDER
 
-def user_send_screenshot(update: Update, context: CallbackContext):
+def user_send_screenshot(update, context):
     if not check_subscription(update, context):
         return ConversationHandler.END
     if update.message.text == "🔙 Back to Sub Categories":
@@ -1301,7 +1304,7 @@ def user_send_screenshot(update: Update, context: CallbackContext):
     if not order:
         return ConversationHandler.END
     if not update.message.photo:
-        update.message.reply_text("❌ অনুগ্রহ করে শুধু একটি ছবি পাঠান。", reply_markup=ReplyKeyboardMarkup([[KeyboardButton("🔙 Back to Sub Categories"), KeyboardButton("🔙 Back to Main Menu")]], resize_keyboard=True))
+        update.message.reply_text("❌ অনুগ্রহ করে শুধু একটি ছবি পাঠান।", reply_markup=ReplyKeyboardMarkup([[KeyboardButton("🔙 Back to Sub Categories"), KeyboardButton("🔙 Back to Main Menu")]], resize_keyboard=True))
         return WAIT_SCREENSHOT
     user = update.effective_user
     username = user.username if user.username else 'N/A'
@@ -1318,13 +1321,13 @@ def user_send_screenshot(update: Update, context: CallbackContext):
          InlineKeyboardButton("❌ Cancel Order", callback_data=f"cancel_manual:{user.id}")]
     ])
     context.bot.send_photo(chat_id=ADMIN_ID, photo=update.message.photo[-1].file_id, caption=caption, reply_markup=keyboard)
-    update.message.reply_text("✅ স্ক্রিনশট অ্যাডমিনকে পাঠানো হয়েছে。")
+    update.message.reply_text("✅ স্ক্রিনশট অ্যাডমিনকে পাঠানো হয়েছে।")
     start(update, context)
     context.user_data.clear()
     return ConversationHandler.END
 
-# Admin Order Actions
-def admin_order_action(update: Update, context: CallbackContext):
+# ================ ADMIN ORDER ACTIONS ================
+def admin_order_action(update, context):
     global total_sales, sales_count_per_category, transaction_log, user_sales
     query = update.callback_query
     query.answer()
@@ -1358,7 +1361,7 @@ def admin_order_action(update: Update, context: CallbackContext):
             caption=f"✅ আপনার অর্ডার নিশ্চিত করা হয়েছে!\n"
                     f"📦 {sub_cat} - {qty} টি আইটেম\n"
                     f"💰 মোট: {total_price} টাকা\n"
-                    f"📄 এক্সেল ফাইলে আপনার অর্ডার সংযুক্ত আছে।"
+                    f"📄 এক্সেল ফাইলে আপনার অর্ডার সংযুক্ত আছে。"
         )
         total_sales += total_price
         sales_count_per_category[sub_cat] = sales_count_per_category.get(sub_cat, 0) + qty
@@ -1376,7 +1379,7 @@ def admin_order_action(update: Update, context: CallbackContext):
         context.bot.send_message(
             chat_id=uid,
             text="✅ আপনার অর্ডার নিশ্চিত করা হয়েছে। অ্যাডমিন শীঘ্রই আপনাকে বিস্তারিত তথ্য পাঠাবেন।\n\n"
-                 "⚠️ দয়া করে অপেক্ষা করুন, অ্যাডমিন আপনার আইটেম প্রস্তুত করছে。"
+                 "⚠️ দয়া করে অপেক্ষা করুন, অ্যাডমিন আপনার আইটেম প্রস্তুত করছে।"
         )
         context.bot.send_message(
             chat_id=ADMIN_ID,
@@ -1385,7 +1388,7 @@ def admin_order_action(update: Update, context: CallbackContext):
                  f"ক্যাটাগরি: {sub_cat}\n"
                  f"পরিমাণ: {qty} টি\n"
                  f"মোট: {total_price} টাকা\n\n"
-                 f"স্টকে পর্যাপ্ত আইটেম নেই। অনুগ্রহ করে ম্যানুয়ালি আইটেম পাঠান。"
+                 f"স্টকে পর্যাপ্ত আইটেম নেই। অনুগ্রহ করে ম্যানুয়ালি আইটেম পাঠান।"
         )
         total_sales += total_price
         sales_count_per_category[sub_cat] = sales_count_per_category.get(sub_cat, 0) + qty
@@ -1395,11 +1398,11 @@ def admin_order_action(update: Update, context: CallbackContext):
         query.edit_message_caption(query.message.caption + f"\n\n✅ ফোর্স নিশ্চিত করা হয়েছে। ইউজারকে ম্যানুয়ালি যোগাযোগ করা হবে。", reply_markup=None)
     elif data.startswith("cancel_manual:"):
         _, uid = data.split(":")
-        context.bot.send_message(chat_id=uid, text="❌ দুঃখিত, আপনার অর্ডারটি বাতিল করা হয়েছে।")
+        context.bot.send_message(chat_id=uid, text="❌ দুঃখিত, আপনার অর্ডারটি বাতিল করা হয়েছে。")
         query.edit_message_caption(query.message.caption + "\n\n❌ অ্যাডমিন দ্বারা বাতিল", reply_markup=None)
 
-# Admin Deposit Actions
-def admin_deposit_action(update: Update, context: CallbackContext):
+# ================ ADMIN DEPOSIT ACTIONS ================
+def admin_deposit_action(update, context):
     global total_deposits, transaction_log, user_deposits, balances
     query = update.callback_query
     query.answer()
@@ -1428,7 +1431,7 @@ def admin_deposit_action(update: Update, context: CallbackContext):
             query.edit_message_caption(
                 query.message.caption +
                 f"\n\n✅ নিশ্চিত করা হয়েছে। {amount} টাকা ইউজার {uid} এর ব্যালেন্সে যোগ করা হয়েছে। "
-                f"বর্তমান মোট ব্যালেন্স: {balances[uid]} টাকা。",
+                f"বর্তমান মোট ব্যালেন্স: {balances[uid]} টাকা।",
                 reply_markup=None
             )
         except Exception as e:
@@ -1442,7 +1445,7 @@ def admin_deposit_action(update: Update, context: CallbackContext):
         except Exception as e:
             logger.error(f"Failed to edit message caption on deposit cancellation: {e}")
 
-# Main
+# ================ MAIN ================
 def main():
     logger.info("🤖 Starting Telegram Bot...")
     try:
