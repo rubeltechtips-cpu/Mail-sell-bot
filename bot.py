@@ -1370,7 +1370,7 @@ def admin_order_action(update, context):
         context.bot.send_message(
             chat_id=uid,
             text="✅ আপনার অর্ডার নিশ্চিত করা হয়েছে। অ্যাডমিন শীঘ্রই আপনাকে বিস্তারিত তথ্য পাঠাবেন।\n\n"
-                 "⚠️ দয়া করে অপেক্ষা করুন, অ্যাডমিন আপনার আইটেম প্রস্তুত করছে।"
+                 "⚠️ দয়া করে অপেক্ষা করুন, অ্যাডমিন আপনার আইটেম প্রস্তুত করছে。"
         )
         context.bot.send_message(
             chat_id=ADMIN_ID,
@@ -1389,7 +1389,7 @@ def admin_order_action(update, context):
         query.edit_message_caption(query.message.caption + f"\n\n✅ ফোর্স নিশ্চিত করা হয়েছে। ইউজারকে ম্যানুয়ালি যোগাযোগ করা হবে।", reply_markup=None)
     elif data.startswith("cancel_manual:"):
         _, uid = data.split(":")
-        context.bot.send_message(chat_id=uid, text="❌ দুঃখিত, আপনার অর্ডারটি বাতিল করা হয়েছে।")
+        context.bot.send_message(chat_id=uid, text="❌ দুঃখিত, আপনার অর্ডারটি বাতিল করা হয়েছে。")
         query.edit_message_caption(query.message.caption + "\n\n❌ অ্যাডমিন দ্বারা বাতিল", reply_markup=None)
 
 def admin_deposit_action(update, context):
@@ -1429,7 +1429,7 @@ def admin_deposit_action(update, context):
     else:
         _, uid = data.split(":")
         uid = int(uid)
-        context.bot.send_message(chat_id=uid, text="❌ দুঃখিত, আপনার ডিপোজিট রিকোয়েস্ট বাতিল করা হয়েছে。")
+        context.bot.send_message(chat_id=uid, text="❌ দুঃখিত, আপনার ডিপোজিট রিকোয়েস্ট বাতিল করা হয়েছে।")
         try:
             query.edit_message_caption(query.message.caption + "\n\n❌ অ্যাডমিন দ্বারা ডিপোজিট বাতিল", reply_markup=None)
         except Exception as e:
