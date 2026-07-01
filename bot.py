@@ -26,7 +26,7 @@ from telegram.ext import (
 )
 from openpyxl import Workbook
 
-# ================ HTTP SERVER ================
+# HTTP Server
 class HealthCheckHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path == '/':
@@ -57,7 +57,7 @@ def run_http_server():
 
 threading.Thread(target=run_http_server, daemon=True).start()
 
-# ================ CONFIG ================
+# Config
 BOT_TOKEN = "8349208659:AAEyJikjx1tUri_PztFGRca_lPT0WilJ0N0"
 ADMIN_ID = 8061006207
 ADMIN_USERNAME = "Rubel_QSB"
@@ -70,7 +70,7 @@ os.makedirs(DATA_DIR, exist_ok=True)
 os.makedirs(TXT_DIR, exist_ok=True)
 os.makedirs(EXCEL_DIR, exist_ok=True)
 
-# ================ STATES ================
+# States
 (
     MAIN_MENU, BUY_MENU, BUY_SUB_MENU, ADMIN_PANEL,
     ADD_MAIN_CAT, REMOVE_MAIN_CAT, MANAGE_CATEGORY, MANAGE_SUB_CATEGORY,
@@ -85,7 +85,7 @@ os.makedirs(EXCEL_DIR, exist_ok=True)
 logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# ================ DATA ================
+# Data
 categories = {}
 prices = {}
 payment_info = "বিকাশ: 017XXXXXXXX\nনগদ: 018XXXXXXXX\nবিন্যান্স: yourmail@gmail.com"
@@ -138,7 +138,7 @@ def save_user_data():
 
 load_user_data()
 
-# ================ HELPERS ================
+# Helpers
 def get_txt_path(main_cat, sub_cat):
     file_name = f"{main_cat}_{sub_cat}.txt".replace(" ", "_").replace("-", "_")
     return os.path.join(TXT_DIR, file_name)
@@ -216,7 +216,7 @@ def get_report_summary(transactions, days):
 def get_user_transactions(user_id, transactions):
     return [t for t in transactions if t[1] == user_id]
 
-# ================ CHECK SUBSCRIPTION ================
+# Check Subscription
 def check_subscription(update, context):
     user_id = update.effective_user.id
     try:
@@ -238,7 +238,7 @@ def check_subscription(update, context):
         update.message.reply_text("চ্যানেল সদস্যতা পরীক্ষা করতে সমস্যা হচ্ছে।")
         return False
 
-# ================ START ================
+# Start
 def start(update, context):
     if not check_subscription(update, context):
         return ConversationHandler.END
@@ -315,7 +315,7 @@ def menu_handler(update, context):
     
     return MAIN_MENU
 
-# ================ DASHBOARD ================
+# Dashboard
 def show_dashboard(update, context):
     if update.effective_user.id != ADMIN_ID:
         return MAIN_MENU
@@ -413,7 +413,6 @@ def handle_dashboard_refresh(update, context):
         return show_dashboard(update, context)
     return back_to_admin_panel_handler(update, context)
 
-# ================ USER PROFILE ================
 def view_user_profile(update, context):
     if update.effective_user.id != ADMIN_ID:
         return MAIN_MENU
@@ -477,7 +476,6 @@ def search_and_show_user_profile(update, context):
     update.message.reply_text(profile_text, reply_markup=ReplyKeyboardMarkup([[KeyboardButton("🔙 Admin Panel")]], resize_keyboard=True))
     return SEARCH_USER_PROFILE
 
-# ================ BALANCE EDIT ================
 def edit_user_balance_start(update, context):
     if update.effective_user.id != ADMIN_ID:
         return MAIN_MENU
@@ -589,7 +587,6 @@ def receive_balance_edit_amount(update, context):
     context.user_data.pop('balance_edit_action', None)
     return show_dashboard(update, context)
 
-# ================ DEPOSIT ================
 def deposit_handler(update, context):
     amount_str = update.message.text.strip()
     if amount_str == "🔙 Back to Main Menu":
@@ -631,7 +628,6 @@ def receive_deposit_screenshot(update, context):
     context.user_data.clear()
     return ConversationHandler.END
 
-# ================ ADMIN PANEL ================
 def back_to_admin_panel_handler(update, context):
     if update.effective_user.id != ADMIN_ID:
         return MAIN_MENU
@@ -753,7 +749,6 @@ def send_notice_text(update, context):
     update.message.reply_text(f"✅ নোটিশ পাঠানো হয়েছে।\n\nসফল: {notice_count} জন\nব্যর্থ: {len(failed_users)} জন", reply_markup=ReplyKeyboardMarkup([[KeyboardButton("🔙 Admin Panel")]], resize_keyboard=True))
     return back_to_admin_panel_handler(update, context)
 
-# ================ MANAGE CATEGORIES ================
 def back_to_manage_main_categories_handler(update, context):
     if "active_main_cat" in context.user_data:
         del context.user_data["active_main_cat"]
@@ -1013,7 +1008,7 @@ def add_items_txt_handler(update, context):
                 update.message.reply_text(
                     f"✅ '{sub_cat}' তে আইটেম যোগ হয়েছে।\n"
                     f"বর্তমান মোট আইটেম: {count} টি\n\n"
-                    f"আরও ফাইল আপলোড করতে পারেন অথবা '✅ Done' চাপুন।",
+                    f"আরও ফাইল আপলোড করতে পারেন অথবা '✅ Done' চাপুন。",
                     reply_markup=ReplyKeyboardMarkup(
                         [[KeyboardButton("✅ Done"), KeyboardButton("🔙 Manage Categories"), KeyboardButton("🔙 Admin Panel")]],
                         resize_keyboard=True
@@ -1042,7 +1037,6 @@ def add_items_txt_handler(update, context):
         return ADD_ITEMS_TXT
     return ADD_ITEMS_TXT
 
-# ================ EDIT PRICE ================
 def edit_payment_info(update, context):
     if update.effective_user.id != ADMIN_ID:
         return MAIN_MENU
@@ -1117,7 +1111,6 @@ def receive_price(update, context):
         return RECEIVE_NEW_PRICE
     return back_to_admin_panel_handler(update, context)
 
-# ================ BUY FLOW ================
 def back_to_categories_handler(update, context):
     if not check_subscription(update, context):
         return ConversationHandler.END
@@ -1325,7 +1318,6 @@ def user_send_screenshot(update, context):
     context.user_data.clear()
     return ConversationHandler.END
 
-# ================ ADMIN ORDER ACTIONS ================
 def admin_order_action(update, context):
     global total_sales, sales_count_per_category, transaction_log, user_sales
     query = update.callback_query
@@ -1367,7 +1359,7 @@ def admin_order_action(update, context):
         transaction_log.append(('sale', uid, total_price, time.time()))
         user_sales[uid] = user_sales.get(uid, 0) + total_price
         save_user_data()
-        query.edit_message_caption(query.message.caption + f"\n\n✅ অ্যাডমিন দ্বারা নিশ্চিত। এক্সেল ফাইল ইউজারকে পাঠানো হয়েছে।", reply_markup=None)
+        query.edit_message_caption(query.message.caption + f"\n\n✅ অ্যাডমিন দ্বারা নিশ্চিত। এক্সেল ফাইল ইউজারকে পাঠানো হয়েছে。", reply_markup=None)
     elif data.startswith("force_confirm:"):
         parts = data.split(":")
         uid = int(parts[1])
@@ -1400,7 +1392,6 @@ def admin_order_action(update, context):
         context.bot.send_message(chat_id=uid, text="❌ দুঃখিত, আপনার অর্ডারটি বাতিল করা হয়েছে।")
         query.edit_message_caption(query.message.caption + "\n\n❌ অ্যাডমিন দ্বারা বাতিল", reply_markup=None)
 
-# ================ ADMIN DEPOSIT ACTIONS ================
 def admin_deposit_action(update, context):
     global total_deposits, transaction_log, user_deposits, balances
     query = update.callback_query
@@ -1438,13 +1429,12 @@ def admin_deposit_action(update, context):
     else:
         _, uid = data.split(":")
         uid = int(uid)
-        context.bot.send_message(chat_id=uid, text="❌ দুঃখিত, আপনার ডিপোজিট রিকোয়েস্ট বাতিল করা হয়েছে।")
+        context.bot.send_message(chat_id=uid, text="❌ দুঃখিত, আপনার ডিপোজিট রিকোয়েস্ট বাতিল করা হয়েছে。")
         try:
             query.edit_message_caption(query.message.caption + "\n\n❌ অ্যাডমিন দ্বারা ডিপোজিট বাতিল", reply_markup=None)
         except Exception as e:
             logger.error(f"Failed to edit message caption on deposit cancellation: {e}")
 
-# ================ MAIN ================
 def main():
     logger.info("🤖 Starting Telegram Bot...")
     try:
