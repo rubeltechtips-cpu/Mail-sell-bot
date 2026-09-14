@@ -61,7 +61,7 @@ threading.Thread(target=run_http_server, daemon=True).start()
 BOT_TOKEN = "8349208659:AAEyJikjx1tUri_PztFGRca_lPT0WilJ0N0"
 ADMIN_ID = 8061006207
 ADMIN_USERNAME = "Rubel_QSB"
-CHANNEL_USERNAME = "quick_sell_bd"
+CHANNEL_USERNAME = "@pocket_money_zone"
 DATA_DIR = "categories"
 TXT_DIR = "txt_files"
 EXCEL_DIR = "excel_files"
