@@ -39,12 +39,12 @@ from pathlib import Path
 
 # ================ CONFIG ================
 
-BOT_TOKEN = os.getenv("BOT_TOKEN", "").strip()
+BOT_TOKEN = os.getenv("8349208659:AAEyJikjx1tUri_PztFGRca_lPT0WilJ0N0", "").strip()
 
 # Gemini API: keep the key in an environment variable for safety.
-# Windows CMD: set GEMINI_API_KEY=YOUR_KEY
-# PowerShell: $env:GEMINI_API_KEY="YOUR_KEY"
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").strip()
+# Windows CMD: set GEMINI_API_KEY=AQ.Ab8RN6KV-q795-satGMO8Ehdcbi7XXws2Eqhxfip8cGlE3rO8Q
+# PowerShell: $env:GEMINI_API_KEY="AQ.Ab8RN6KV-q795-satGMO8Ehdcbi7XXws2Eqhxfip8cGlE3rO8Q"
+GEMINI_API_KEY = os.getenv("AQ.Ab8RN6KV-q795-satGMO8Ehdcbi7XXws2Eqhxfip8cGlE3rO8Q", "").strip()
 GEMINI_MODEL = "gemini-3.6-flash"
 
 ADMIN_ID = 8061006207
